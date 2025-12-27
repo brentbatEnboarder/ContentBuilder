@@ -1,0 +1,94 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build outputs
+dist
+dist-ssr
+build
+.next
+out
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Testing
+coverage
+.nyc_output
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+
+# Vite
+*.local
+vite.config.ts.timestamp-*
+
+# Cache
+.cache
+.parcel-cache
+.turbo
+
+# Debug
+*.pid
+*.seed
+*.pid.lock
+
+# Temp files
+tmp
+temp
+*.tmp
+*.temp
+
+# API keys and secrets (extra safety)
+*.pem
+*.key
+secrets.json
+credentials.json
+
+# Server-specific
+server/uploads
+server/tmp
+
+# Generated types
+.supabase
+
+# Lovable reference (don't track changes)
+contentbuilder-core/

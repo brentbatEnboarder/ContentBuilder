@@ -1,0 +1,140 @@
+Here is the detailed implementation guide formatted as a Markdown document. You can pass this directly to your LLM coding assistant (Copilot, Cursor, etc.) to generate the actual code for your application.
+
+***
+
+# Technical Specification: Programmatic "Digital Twin" Generation via NanoBanana Pro
+
+## 1. Objective
+Implement a backend service that accepts a departing employee's avatar photo and programmatically generates a stylized "Digital Twin" representation. This image will serve as the visual interface for the AI RAG Knowledge Base.
+
+**Target Aesthetic:** "The Holographic Interface" (Futuristic, Cyan/Blue Wireframe, High-Tech).
+
+## 2. Architectural Flow
+1.  **Input:** Application receives User Avatar (JPG/PNG) + User Metadata (Gender/Role).
+2.  **Processing:** Convert image to Base64 -> Construct JSON Payload -> Call NanoBanana Pro API.
+3.  **Generation:** Model performs **Image-to-Image (Img2Img)** generation.
+4.  **Output:** Decode response -> Save "Digital Twin" image to Cloud Storage (S3/Blob) -> Link to RAG Profile.
+
+## 3. The Prompt Strategy
+The coding assistant must construct the prompt dynamically. While the base style is static, injecting the subject's gender improves facial structure accuracy.
+
+**Base Prompt Template:**
+```text
+A hyper-detailed digital holographic projection of {GENDER_TOKEN}, maintaining exact facial features and likeness of the attached image, glowing translucent cyan and electric blue wireframe edges, volumetric lighting, data streams and binary code subtly floating in the background, unreal engine 5 render, octane render, 8k resolution, cinematic lighting, digital artifacting, cyberpunk aesthetic.
+```
+
+**Variable Logic:**
+*   `{GENDER_TOKEN}`: If gender is known, insert "a man" or "a woman". If unknown, use "the subject".
+
+## 4. API Interface Specification
+
+### A. Image Pre-processing
+The API requires the image to be passed as a Base64 encoded string, not a raw binary file.
+*   **Format:** Standard Base64 string.
+*   **Resolution:** Resize input images to **512x512** or **1024x1024** (square aspect ratio) before sending. This ensures optimal render time and prevents cropping issues.
+
+### B. The Payload Configuration
+We are using an **Image-to-Image** pipeline. The critical parameters to tune for "Likeness vs. Style" are `strength` (or `denoising_strength`) and `guidance_scale`.
+
+**Recommended Payload Structure:**
+```json
+{
+  "apiKey": "YOUR_NANOBANANA_API_KEY",
+  "modelKey": "YOUR_MODEL_KEY",
+  "modelInputs": {
+    "prompt": "A hyper-detailed digital holographic projection of...",
+    "negative_prompt": "cartoon, painting, illustration, ugly, deformed, distorted face, bad anatomy, extra limbs, blurry, low quality, black and white",
+    "init_image": "data:image/png;base64,iVBORw0KGgo...",
+    "strength": 0.45,
+    "guidance_scale": 7.5,
+    "num_inference_steps": 40,
+    "seed": 42
+  }
+}
+```
+
+### C. Parameter Definitions (Crucial for Consistency)
+
+| Parameter | Value | Explanation |
+| :--- | :--- | :--- |
+| **`strength`** | **0.40 - 0.50** | **THE MOST IMPORTANT SETTING.** <br>• **< 0.3**: Looks too much like the original photo (just a filter).<br>• **> 0.6**: The face will distort and look like a generic person, losing the employee's identity.<br>• **Target**: 0.45 is the sweet spot for "Hologram Texture" + "Real Face". |
+| **`guidance_scale`** | **7.5** | How strictly the AI follows the text prompt vs the image. Standard value. |
+| **`num_inference_steps`** | **30 - 50** | Higher steps = higher quality/detail but slower generation time. 40 is a safe balance. |
+| **`negative_prompt`** | *See above* | Prevents the model from generating cartoons or distorted features. |
+
+## 5. Implementation Guide (Python/Requests)
+
+*Note to Coding Assistant: Use the `requests` library and standard Python `base64` library.*
+
+```python
+import base64
+import requests
+import json
+from PIL import Image
+from io import BytesIO
+
+def encode_image_to_base64(image_path):
+    """Resizes and encodes image to Base64 string"""
+    with Image.open(image_path) as img:
+        # Resize to square 512x512 or 1024x1024 to match model optimization
+        img = img.resize((1024, 1024))
+        buffered = BytesIO()
+        img.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        return img_str
+
+def generate_digital_twin(image_path, gender="the subject"):
+    """
+    Calls NanoBanana Pro to generate the holographic twin.
+    """
+    api_url = "https://api.nanobanana.com/v1/inference" # Replace with actual endpoint
+    api_key = "YOUR_API_KEY"
+    
+    # 1. Prepare Prompt
+    prompt_text = (
+        f"A hyper-detailed digital holographic projection of {gender}, "
+        "maintaining exact facial features and likeness of the attached image, "
+        "glowing translucent cyan and electric blue wireframe edges, "
+        "volumetric lighting, data streams and binary code subtly floating in the background, "
+        "unreal engine 5 render, octane render, 8k resolution, cinematic lighting, "
+        "digital artifacting, cyberpunk aesthetic."
+    )
+
+    # 2. Encode Image
+    base64_image = encode_image_to_base64(image_path)
+
+    # 3. Construct Payload
+    payload = {
+        "apiKey": api_key,
+        "modelInputs": {
+            "prompt": prompt_text,
+            "init_image": base64_image,
+            "strength": 0.45,  # Strict likeness control
+            "guidance_scale": 7.5,
+            "num_inference_steps": 40,
+            "negative_prompt": "cartoon, illustration, low res, blurry, distorted face"
+        }
+    }
+
+    # 4. Execute Request
+    try:
+        response = requests.post(api_url, json=payload)
+        response.raise_for_status()
+        result = response.json()
+        
+        # Depending on API, result might be a URL or a Base64 string
+        # Assuming return is Base64 for this example:
+        return result['modelOutputs'][0]['image_base64']
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Error generating Digital Twin: {e}")
+        return None
+```
+
+## 6. Advanced Optimization: ControlNet (Optional)
+
+If the **NanoBanana Pro** model supports **ControlNet**, update the payload to use the `canny` preprocessor. This is superior to standard Img2Img for likeness preservation.
+
+*   **Logic:** Instead of just passing `init_image`, pass the image into a `controlnet_module` parameter.
+*   **Why:** ControlNet locks the geometry (edges of the eyes, nose, mouth) perfectly while allowing the colors and textures to go fully "Holographic."
+*   **Setting:** If using ControlNet, you can increase `strength` to **0.8**, allowing for much cooler hologram effects without losing the face shape.

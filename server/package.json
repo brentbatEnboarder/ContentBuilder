@@ -1,0 +1,43 @@
+{
+  "name": "contentbuilder-server",
+  "version": "1.0.0",
+  "description": "Backend API for ContentBuilder",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@mendable/firecrawl-js": "^4.10.0",
+    "archiver": "^7.0.1",
+    "cheerio": "^1.0.0",
+    "cors": "^2.8.5",
+    "docx": "^9.4.1",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "mammoth": "^1.9.1",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.2",
+    "openai": "^4.103.0",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/archiver": "^6.0.3",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.3",
+    "@types/jest": "^29.5.14",
+    "@types/morgan": "^1.9.9",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.16.5",
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.10",
+    "ts-jest": "^29.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}

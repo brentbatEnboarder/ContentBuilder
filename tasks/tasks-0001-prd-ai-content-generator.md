@@ -114,22 +114,22 @@ The Lovable-generated codebase (`contentbuilder-core/`) provides a complete UI f
   - [x] 0.16 Create `src/services/api.ts` with axios/fetch wrapper for calling backend APIs
   - [x] 0.17 Test infrastructure by running `npm run dev` and verifying both servers start
 
-- [ ] 1.0 Set up Supabase Authentication
+- [x] 1.0 Set up Supabase Authentication
   *Replace mock localStorage auth with real Supabase Auth. Implement email/password authentication, session management, and protected route logic.*
 
-  - [ ] 1.1 Create Supabase project at supabase.com and enable Email/Password auth provider
-  - [ ] 1.2 Copy Supabase project URL and anon key to `.env` file
-  - [ ] 1.3 Create `src/lib/supabase.ts` with Supabase client initialization using environment variables
-  - [ ] 1.4 Update `AuthContext.tsx` to import and use Supabase client instead of localStorage
-  - [ ] 1.5 Replace mock `login()` function with `supabase.auth.signInWithPassword()`
-  - [ ] 1.6 Replace mock `logout()` function with `supabase.auth.signOut()`
-  - [ ] 1.7 Add `useEffect` to listen for auth state changes with `supabase.auth.onAuthStateChange()`
-  - [ ] 1.8 Update `user` state to use Supabase User type and extract email/metadata
-  - [ ] 1.9 Update `ProtectedRoute.tsx` to check `supabase.auth.getSession()` for valid session
-  - [ ] 1.10 Add loading state while checking initial session on app load
-  - [ ] 1.11 Implement proper error messages for invalid credentials, network errors
-  - [ ] 1.12 Add "Forgot Password" flow using `supabase.auth.resetPasswordForEmail()` (optional, can be deferred)
-  - [ ] 1.13 Test complete auth flow: login, session persistence on refresh, logout
+  - [x] 1.1 Create Supabase project at supabase.com and enable Email/Password auth provider *(Using "Prototypes" project)*
+  - [x] 1.2 Copy Supabase project URL and anon key to `.env` file
+  - [x] 1.3 Create `src/lib/supabase.ts` with Supabase client initialization using environment variables
+  - [x] 1.4 Update `AuthContext.tsx` to import and use Supabase client instead of localStorage
+  - [x] 1.5 Replace mock `login()` function with `supabase.auth.signInWithPassword()`
+  - [x] 1.6 Replace mock `logout()` function with `supabase.auth.signOut()`
+  - [x] 1.7 Add `useEffect` to listen for auth state changes with `supabase.auth.onAuthStateChange()`
+  - [x] 1.8 Update `user` state to use Supabase User type and extract email/metadata
+  - [x] 1.9 Update `ProtectedRoute.tsx` to check `supabase.auth.getSession()` for valid session
+  - [x] 1.10 Add loading state while checking initial session on app load
+  - [x] 1.11 Implement proper error messages for invalid credentials, network errors
+  - [x] 1.12 Add "Forgot Password" flow using `supabase.auth.resetPasswordForEmail()` *(Deferred)*
+  - [x] 1.13 Test complete auth flow: login, session persistence on refresh, logout
 
 - [ ] 2.0 Implement Web Scraping & Company Research Service
   *Create backend service to scrape customer websites for company information and auto-detect brand colors. Integrate with Brave Search API for company research.*

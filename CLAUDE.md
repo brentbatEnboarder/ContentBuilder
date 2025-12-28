@@ -48,10 +48,11 @@ cd server && npm run test:watch    # Jest watch mode
 ### Backend (`/server/src`)
 - **`index.ts`** - Express server with CORS, helmet, morgan
 - **`/routes/scrape.ts`** - POST /api/scrape (website scraping with rate limiting & caching)
-- **`/routes/generate.ts`** - POST /api/generate/text (streaming), /api/generate/interview
+- **`/routes/generate.ts`** - POST /api/generate/text, /api/generate/interview, /api/generate/images
 - **`/services/scraper.ts`** - Firecrawl-based website scraping + node-vibrant color extraction
 - **`/services/braveSearch.ts`** - Company research via Brave Search API
 - **`/services/claude.ts`** - Claude API text generation with streaming support
+- **`/services/imageGen.ts`** - Nano Banana Pro (Gemini) image generation with 8 style presets
 - **`/services/voiceData.ts`** - Voice dimension data for prompt building
 
 ### Key Integrations
@@ -60,8 +61,9 @@ cd server && npm run test:watch    # Jest watch mode
 - **node-vibrant** - Color extraction from OG images
 - **Brave Search** - Company research and industry inference
 - **Claude API** - Text generation via `@anthropic-ai/sdk` with SSE streaming
+- **Nano Banana Pro** - Image generation via `@google/genai` (Gemini `gemini-3-pro-image-preview`)
+- **Supabase Storage** - `generated-images` bucket for storing generated images
 - **OpenAI Whisper** - Speech-to-text via `openai` SDK (to be implemented)
-- **NanoBanana Pro** - Image generation (to be implemented)
 
 ## Coding Patterns
 
@@ -96,6 +98,23 @@ await apiClient.generateTextStream(
 
 // AI interview follow-up
 const response = await apiClient.interview({ objective, companyProfile, voiceSettings, conversationHistory });
+
+// Generate images with Nano Banana Pro
+const images = await apiClient.generateImages({
+  contentSummary: 'Welcome new employees to our team',
+  styleId: 'flat',  // corporate, flat, isometric, abstract, handdrawn, photorealistic, minimalist, warm
+  customPrompt: 'include diverse people',
+  brandColors: { primary: '#7C21CC', secondary: '', accent: '' },
+  aspectRatio: '16:9',  // 1:1, 16:9, 4:3, 3:2
+  count: 3
+});
+
+// Regenerate single image
+const newImage = await apiClient.regenerateImage({
+  originalPrompt: 'original prompt text',
+  modifiedPrompt: 'add more color',
+  aspectRatio: '16:9'
+});
 ```
 
 ## Environment Variables
@@ -110,7 +129,8 @@ VITE_SUPABASE_ANON_KEY=...
 FIRECRAWL_API_KEY=...          # Required for website scraping
 BRAVE_API_KEY=...              # Optional for company research
 ANTHROPIC_API_KEY=...          # Required for text generation
-OPENAI_API_KEY=...             # Required for voice transcription
+GOOGLE_API_KEY=...             # Required for image generation (Nano Banana Pro)
+OPENAI_API_KEY=...             # Required for voice transcription (not yet implemented)
 ```
 
 ## Task Tracking
@@ -128,6 +148,7 @@ Active tasks are tracked in `/tasks/tasks-0001-prd-ai-content-generator.md`. Fol
 - Task 1.0: Supabase authentication
 - Task 2.0: Web scraping & company research (Firecrawl + Brave Search)
 - Task 3.0: Claude API text generation (streaming, interview, regeneration)
+- Task 4.0: Nano Banana Pro image generation (8 styles, regeneration, Supabase Storage)
 
 **Next:**
-- Task 4.0: NanoBanana API image generation
+- Task 5.0: Voice input with Whisper API

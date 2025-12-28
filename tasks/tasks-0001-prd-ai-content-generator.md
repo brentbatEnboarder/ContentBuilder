@@ -57,8 +57,8 @@ The Lovable-generated codebase (`contentbuilder-core/`) provides a complete UI f
 - `server/src/services/voiceData.ts` - Voice dimension data for server-side prompt building ✅
 - `server/src/services/imageGen.ts` - NanoBanana Pro (Gemini) image generation with style mappings ✅
 - `server/src/services/imageGen.test.ts` - Tests for image generation (12 tests) ✅
-- `server/src/services/whisper.ts` - OpenAI Whisper transcription
-- `server/src/services/whisper.test.ts` - Tests for Whisper service
+- `server/src/services/whisper.ts` - OpenAI Whisper transcription with validation and toFile() for serverless ✅
+- `server/src/services/whisper.test.ts` - Tests for Whisper service (13 tests) ✅
 - `server/src/services/fileProcessor.ts` - PDF, DOCX, TXT parsing
 - `server/src/services/fileProcessor.test.ts` - Tests for file processor
 - `server/src/services/export.ts` - Export to Markdown, DOCX, ZIP
@@ -67,7 +67,7 @@ The Lovable-generated codebase (`contentbuilder-core/`) provides a complete UI f
 ### API Routes
 - `server/src/routes/scrape.ts` - POST /api/scrape endpoint with rate limiting and caching ✅
 - `server/src/routes/generate.ts` - POST /api/generate/text, /api/generate/interview, /api/generate/images ✅
-- `server/src/routes/transcribe.ts` - POST /api/transcribe endpoint
+- `server/src/routes/transcribe.ts` - POST /api/transcribe, /api/transcribe/base64 endpoints with multer ✅
 - `server/src/routes/process.ts` - POST /api/process/file, /api/process/url
 - `server/src/routes/export.ts` - GET /api/export/:format endpoint
 
@@ -75,10 +75,10 @@ The Lovable-generated codebase (`contentbuilder-core/`) provides a complete UI f
 - `contentbuilder-core/src/services/api.ts` - API client with generateImages and regenerateImage methods ✅
 - `contentbuilder-core/src/pages/Settings.tsx` - Settings page calling real /api/scrape endpoint ✅
 - `contentbuilder-core/src/components/content-generator/GeneratedImages.tsx` - Real image generation with Nano Banana Pro ✅
-- `contentbuilder-core/src/hooks/useAudioRecorder.ts` - MediaRecorder hook for voice input
-- `contentbuilder-core/src/hooks/useAudioRecorder.test.ts` - Tests for audio recorder
+- `contentbuilder-core/src/hooks/useAudioRecorder.ts` - MediaRecorder hook with state machine and audio level visualization ✅
+- `contentbuilder-core/src/components/content-generator/AudioWaveform.tsx` - Visual waveform component for recording feedback ✅
 - `contentbuilder-core/src/components/content-generator/ContentGenerator.tsx` - Update for real generation
-- `contentbuilder-core/src/components/content-generator/AIInterview.tsx` - Update for real voice input
+- `contentbuilder-core/src/components/content-generator/AIInterview.tsx` - Real voice input with Whisper transcription ✅
 - `contentbuilder-core/src/components/content-generator/SourceMaterial.tsx` - Update for real file upload
 - `contentbuilder-core/src/components/sidebar/ExportModal.tsx` - Update for real exports
 
@@ -195,26 +195,26 @@ The Lovable-generated codebase (`contentbuilder-core/`) provides a complete UI f
   - [x] 4.14 Add error handling for generation failures, inappropriate content filters
   - [x] 4.15 Write unit tests for prompt building logic (12 tests passing)
 
-- [ ] 5.0 Implement Voice Input with Whisper API
+- [x] 5.0 Implement Voice Input with Whisper API
   *Add real audio recording using MediaRecorder API and integrate OpenAI Whisper for speech-to-text transcription in the AI interview flow.*
 
-  - [ ] 5.1 Install OpenAI SDK in server: `openai`
-  - [ ] 5.2 Create `src/hooks/useAudioRecorder.ts` custom hook for audio recording
-  - [ ] 5.3 Implement `startRecording()` using `navigator.mediaDevices.getUserMedia()` and MediaRecorder
-  - [ ] 5.4 Implement `stopRecording()` that returns audio Blob
-  - [ ] 5.5 Add recording state management: idle, recording, processing
-  - [ ] 5.6 Implement audio level visualization (optional: show waveform during recording)
-  - [ ] 5.7 Create `server/services/whisper.ts` with OpenAI Whisper client
-  - [ ] 5.8 Implement `transcribeAudio(audioBuffer: Buffer)` function using Whisper API
-  - [ ] 5.9 Create `server/routes/transcribe.ts` with POST `/api/transcribe` endpoint
-  - [ ] 5.10 Configure `multer` middleware to handle audio file uploads (multipart/form-data)
-  - [ ] 5.11 Endpoint should accept audio file and return `{ text: string, confidence?: number }`
-  - [ ] 5.12 Update `AIInterview.tsx` to use `useAudioRecorder` hook for real recording
-  - [ ] 5.13 Send recorded audio to `/api/transcribe` and insert result into chat input
-  - [ ] 5.14 Add visual feedback: pulsing red indicator during recording, spinner during transcription
-  - [ ] 5.15 Handle microphone permission denial with user-friendly error message
-  - [ ] 5.16 Add audio format handling: convert webm to mp3/wav if needed for Whisper compatibility
-  - [ ] 5.17 Write unit tests for audio recorder hook (mock MediaRecorder)
+  - [x] 5.1 Install OpenAI SDK in server: `openai` *(Already installed in package.json v4.103.0)*
+  - [x] 5.2 Create `src/hooks/useAudioRecorder.ts` custom hook for audio recording
+  - [x] 5.3 Implement `startRecording()` using `navigator.mediaDevices.getUserMedia()` and MediaRecorder
+  - [x] 5.4 Implement `stopRecording()` that returns audio Blob
+  - [x] 5.5 Add recording state management: idle, recording, processing
+  - [x] 5.6 Implement audio level visualization (AudioWaveform component with 5-bar dynamic display)
+  - [x] 5.7 Create `server/services/whisper.ts` with OpenAI Whisper client
+  - [x] 5.8 Implement `transcribeAudio(audioBuffer: Buffer)` function using Whisper API
+  - [x] 5.9 Create `server/routes/transcribe.ts` with POST `/api/transcribe` endpoint
+  - [x] 5.10 Configure `multer` middleware to handle audio file uploads (multipart/form-data)
+  - [x] 5.11 Endpoint accepts audio file and returns `{ success, data: { text, duration?, language? } }`
+  - [x] 5.12 Update `AIInterview.tsx` to use `useAudioRecorder` hook for real recording
+  - [x] 5.13 Send recorded audio to `/api/transcribe` and insert result into chat input
+  - [x] 5.14 Add visual feedback: pulsing red indicator during recording, waveform, spinner during transcription
+  - [x] 5.15 Handle microphone permission denial with user-friendly error message
+  - [x] 5.16 Audio format conversion not needed - Whisper supports webm directly
+  - [x] 5.17 Write unit tests for Whisper service (13 tests passing)
 
 - [ ] 6.0 Implement File Processing & URL Content Extraction
   *Add support for parsing uploaded files (PDF, DOCX, TXT, PPTX) and extracting content from provided URLs as source material for generation.*

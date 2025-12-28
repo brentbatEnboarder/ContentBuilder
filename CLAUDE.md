@@ -49,11 +49,16 @@ cd server && npm run test:watch    # Jest watch mode
 - **`index.ts`** - Express server with CORS, helmet, morgan
 - **`/routes/scrape.ts`** - POST /api/scrape (website scraping with rate limiting & caching)
 - **`/routes/generate.ts`** - POST /api/generate/text, /api/generate/interview, /api/generate/images
+- **`/routes/transcribe.ts`** - POST /api/transcribe, /api/transcribe/base64 (voice transcription)
 - **`/services/scraper.ts`** - Firecrawl-based website scraping + node-vibrant color extraction
 - **`/services/braveSearch.ts`** - Company research via Brave Search API
 - **`/services/claude.ts`** - Claude API text generation with streaming support
 - **`/services/imageGen.ts`** - Nano Banana Pro (Gemini) image generation with 8 style presets
+- **`/services/whisper.ts`** - OpenAI Whisper speech-to-text transcription
 - **`/services/voiceData.ts`** - Voice dimension data for prompt building
+
+### Frontend Hooks
+- **`/hooks/useAudioRecorder.ts`** - MediaRecorder hook with state machine and audio level
 
 ### Key Integrations
 - **Supabase** - Auth + database (project: "Prototypes", id: `gosgvisonkpkpsztbeok`)
@@ -63,7 +68,7 @@ cd server && npm run test:watch    # Jest watch mode
 - **Claude API** - Text generation via `@anthropic-ai/sdk` with SSE streaming
 - **Nano Banana Pro** - Image generation via `@google/genai` (Gemini `gemini-3-pro-image-preview`)
 - **Supabase Storage** - `generated-images` bucket for storing generated images
-- **OpenAI Whisper** - Speech-to-text via `openai` SDK (to be implemented)
+- **OpenAI Whisper** - Speech-to-text via `openai` SDK using whisper-1 model
 
 ## Coding Patterns
 
@@ -115,6 +120,23 @@ const newImage = await apiClient.regenerateImage({
   modifiedPrompt: 'add more color',
   aspectRatio: '16:9'
 });
+
+// Transcribe audio (from useAudioRecorder hook)
+const audioBlob = await stopRecording();
+const result = await apiClient.transcribe(audioBlob);
+console.log(result.data.text);  // Transcribed text
+```
+
+### Audio Recording Pattern
+```tsx
+import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+
+const { state, startRecording, stopRecording, audioLevel, error } = useAudioRecorder();
+
+// state: 'idle' | 'recording' | 'processing'
+// audioLevel: 0-1 for visualization
+// startRecording(): Promise<void> - starts mic capture
+// stopRecording(): Promise<Blob | null> - stops and returns audio blob
 ```
 
 ## Environment Variables
@@ -130,7 +152,7 @@ FIRECRAWL_API_KEY=...          # Required for website scraping
 BRAVE_API_KEY=...              # Optional for company research
 ANTHROPIC_API_KEY=...          # Required for text generation
 GOOGLE_API_KEY=...             # Required for image generation (Nano Banana Pro)
-OPENAI_API_KEY=...             # Required for voice transcription (not yet implemented)
+OPENAI_API_KEY=...             # Required for voice transcription
 ```
 
 ## Task Tracking
@@ -149,6 +171,7 @@ Active tasks are tracked in `/tasks/tasks-0001-prd-ai-content-generator.md`. Fol
 - Task 2.0: Web scraping & company research (Firecrawl + Brave Search)
 - Task 3.0: Claude API text generation (streaming, interview, regeneration)
 - Task 4.0: Nano Banana Pro image generation (8 styles, regeneration, Supabase Storage)
+- Task 5.0: Voice input with Whisper API (MediaRecorder, waveform visualization, transcription)
 
 **Next:**
-- Task 5.0: Voice input with Whisper API
+- Task 6.0: File processing & URL content extraction

@@ -48,15 +48,18 @@ cd server && npm run test:watch    # Jest watch mode
 ### Backend (`/server/src`)
 - **`index.ts`** - Express server with CORS, helmet, morgan
 - **`/routes/scrape.ts`** - POST /api/scrape (website scraping with rate limiting & caching)
+- **`/routes/generate.ts`** - POST /api/generate/text (streaming), /api/generate/interview
 - **`/services/scraper.ts`** - Firecrawl-based website scraping + node-vibrant color extraction
 - **`/services/braveSearch.ts`** - Company research via Brave Search API
+- **`/services/claude.ts`** - Claude API text generation with streaming support
+- **`/services/voiceData.ts`** - Voice dimension data for prompt building
 
 ### Key Integrations
 - **Supabase** - Auth + database (project: "Prototypes", id: `gosgvisonkpkpsztbeok`)
 - **Firecrawl** - Web scraping via `@mendable/firecrawl-js` (extracts metadata, handles JS rendering)
 - **node-vibrant** - Color extraction from OG images
 - **Brave Search** - Company research and industry inference
-- **Claude API** - Text generation via `@anthropic-ai/sdk` (to be implemented)
+- **Claude API** - Text generation via `@anthropic-ai/sdk` with SSE streaming
 - **OpenAI Whisper** - Speech-to-text via `openai` SDK (to be implemented)
 - **NanoBanana Pro** - Image generation (to be implemented)
 
@@ -79,7 +82,20 @@ const { user, login, logout, loading } = useAuth();
 ### API Client Pattern
 ```tsx
 import { apiClient } from '@/services/api';
+
+// Scrape website for company info
 const result = await apiClient.scrape('https://example.com');
+
+// Generate content with streaming
+await apiClient.generateTextStream(
+  request,
+  (chunk) => setText(prev => prev + chunk),  // onChunk
+  () => setComplete(true),                    // onComplete
+  (error) => setError(error.message)          // onError
+);
+
+// AI interview follow-up
+const response = await apiClient.interview({ objective, companyProfile, voiceSettings, conversationHistory });
 ```
 
 ## Environment Variables
@@ -111,6 +127,7 @@ Active tasks are tracked in `/tasks/tasks-0001-prd-ai-content-generator.md`. Fol
 - Task 0.0: Project infrastructure & dependencies
 - Task 1.0: Supabase authentication
 - Task 2.0: Web scraping & company research (Firecrawl + Brave Search)
+- Task 3.0: Claude API text generation (streaming, interview, regeneration)
 
 **Next:**
-- Task 3.0: Claude API text generation
+- Task 4.0: NanoBanana API image generation

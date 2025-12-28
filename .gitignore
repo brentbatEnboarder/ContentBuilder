@@ -92,3 +92,6 @@ server/tmp
 
 # Lovable reference (don't track changes)
 contentbuilder-core/
+
+# Public assets (temporary/generated)
+public/

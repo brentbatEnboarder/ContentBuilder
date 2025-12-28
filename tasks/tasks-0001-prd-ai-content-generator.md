@@ -55,8 +55,8 @@ The Lovable-generated codebase (`contentbuilder-core/`) provides a complete UI f
 - `server/src/services/claude.ts` - Claude API integration for text generation ✅
 - `server/src/services/claude.test.ts` - Tests for Claude service (14 tests for prompt building and voice settings) ✅
 - `server/src/services/voiceData.ts` - Voice dimension data for server-side prompt building ✅
-- `server/src/services/imageGen.ts` - NanoBanana image generation
-- `server/src/services/imageGen.test.ts` - Tests for image generation
+- `server/src/services/imageGen.ts` - NanoBanana Pro (Gemini) image generation with style mappings ✅
+- `server/src/services/imageGen.test.ts` - Tests for image generation (12 tests) ✅
 - `server/src/services/whisper.ts` - OpenAI Whisper transcription
 - `server/src/services/whisper.test.ts` - Tests for Whisper service
 - `server/src/services/fileProcessor.ts` - PDF, DOCX, TXT parsing
@@ -66,14 +66,15 @@ The Lovable-generated codebase (`contentbuilder-core/`) provides a complete UI f
 
 ### API Routes
 - `server/src/routes/scrape.ts` - POST /api/scrape endpoint with rate limiting and caching ✅
-- `server/src/routes/generate.ts` - POST /api/generate/text (streaming), /api/generate/interview ✅
+- `server/src/routes/generate.ts` - POST /api/generate/text, /api/generate/interview, /api/generate/images ✅
 - `server/src/routes/transcribe.ts` - POST /api/transcribe endpoint
 - `server/src/routes/process.ts` - POST /api/process/file, /api/process/url
 - `server/src/routes/export.ts` - GET /api/export/:format endpoint
 
 ### Frontend Updates
-- `contentbuilder-core/src/services/api.ts` - API client with typed ScrapeResponse interface ✅
+- `contentbuilder-core/src/services/api.ts` - API client with generateImages and regenerateImage methods ✅
 - `contentbuilder-core/src/pages/Settings.tsx` - Settings page calling real /api/scrape endpoint ✅
+- `contentbuilder-core/src/components/content-generator/GeneratedImages.tsx` - Real image generation with Nano Banana Pro ✅
 - `contentbuilder-core/src/hooks/useAudioRecorder.ts` - MediaRecorder hook for voice input
 - `contentbuilder-core/src/hooks/useAudioRecorder.test.ts` - Tests for audio recorder
 - `contentbuilder-core/src/components/content-generator/ContentGenerator.tsx` - Update for real generation
@@ -175,24 +176,24 @@ The Lovable-generated codebase (`contentbuilder-core/`) provides a complete UI f
   - [x] 3.15 Add error handling for API rate limits, token limits, and network failures
   - [x] 3.16 Write unit tests for prompt building and voice settings conversion (14 tests passing)
 
-- [ ] 4.0 Integrate NanoBanana API for Image Generation
-  *Connect to NanoBanana Pro API for AI image generation. Apply selected image style presets and custom prompts to generate relevant visuals.*
+- [x] 4.0 Integrate NanoBanana API for Image Generation
+  *Connect to NanoBanana Pro API (Gemini gemini-3-pro-image-preview) for AI image generation. Apply selected image style presets and custom prompts to generate relevant visuals.*
 
-  - [ ] 4.1 Research NanoBanana Pro API documentation and authentication method
-  - [ ] 4.2 Create `server/services/imageGen.ts` with API client setup
-  - [ ] 4.3 Create `styleToPrompt` mapping object converting style IDs to detailed image prompts
-  - [ ] 4.4 Implement `generateImages()` function accepting content summary, style, and custom additions
-  - [ ] 4.5 Build image prompt that combines: content context + style preset + brand colors + custom prompt
-  - [ ] 4.6 Add POST `/api/generate/images` endpoint to `server/routes/generate.ts`
-  - [ ] 4.7 Endpoint should accept `{ contentSummary, styleId, customPrompt, brandColors }` and return 3 image URLs
-  - [ ] 4.8 Implement image storage: save generated images to Supabase Storage bucket
-  - [ ] 4.9 Create Supabase Storage bucket "generated-images" with public read access
-  - [ ] 4.10 Update `GeneratedImages.tsx` to display real images from API response
-  - [ ] 4.11 Implement image regeneration with modified prompts
-  - [ ] 4.12 Add progress indicator during image generation (can take 10-30 seconds)
-  - [ ] 4.13 Implement single image regeneration (regenerate just one of the 3 images)
-  - [ ] 4.14 Add error handling for generation failures, inappropriate content filters
-  - [ ] 4.15 Write unit tests for prompt building logic
+  - [x] 4.1 Research NanoBanana Pro API documentation and authentication method
+  - [x] 4.2 Create `server/services/imageGen.ts` with API client setup
+  - [x] 4.3 Create `styleToPrompt` mapping object converting style IDs to detailed image prompts
+  - [x] 4.4 Implement `generateImages()` function accepting content summary, style, and custom additions
+  - [x] 4.5 Build image prompt that combines: content context + style preset + brand colors + custom prompt
+  - [x] 4.6 Add POST `/api/generate/images` endpoint to `server/routes/generate.ts`
+  - [x] 4.7 Endpoint should accept `{ contentSummary, styleId, customPrompt, brandColors }` and return 3 images (base64)
+  - [x] 4.8 Implement image storage: save generated images to Supabase Storage bucket
+  - [x] 4.9 Create Supabase Storage bucket "generated-images" with public read access
+  - [x] 4.10 Update `GeneratedImages.tsx` to display real images from API response
+  - [x] 4.11 Implement image regeneration with modified prompts
+  - [x] 4.12 Add progress indicator during image generation (can take 10-30 seconds)
+  - [x] 4.13 Implement single image regeneration (regenerate just one of the 3 images)
+  - [x] 4.14 Add error handling for generation failures, inappropriate content filters
+  - [x] 4.15 Write unit tests for prompt building logic (12 tests passing)
 
 - [ ] 5.0 Implement Voice Input with Whisper API
   *Add real audio recording using MediaRecorder API and integrate OpenAI Whisper for speech-to-text transcription in the AI interview flow.*

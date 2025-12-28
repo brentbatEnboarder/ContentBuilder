@@ -41,37 +41,40 @@ The Lovable-generated codebase (`contentbuilder-core/`) provides a complete UI f
 - `contentbuilder-core/server/jest.config.js` - Jest testing configuration ✅
 - `contentbuilder-core/src/services/api.ts` - Frontend API client for backend calls ✅
 
-### Authentication
-- `contentbuilder-core/src/lib/supabase.ts` - Supabase client configuration
-- `contentbuilder-core/src/contexts/AuthContext.tsx` - Update to use Supabase Auth
-- `contentbuilder-core/src/components/ProtectedRoute.tsx` - Update for Supabase session check
+### Authentication ✅
+- `src/lib/supabase.ts` - Supabase client configuration ✅
+- `src/contexts/AuthContext.tsx` - AuthContext with Supabase Auth ✅
+- `src/components/ProtectedRoute.tsx` - Protected route with session check ✅
+- `src/pages/Login.tsx` - Login page with error handling ✅
 
 ### Backend Services
-- `contentbuilder-core/server/services/scraper.ts` - Website scraping and color extraction
-- `contentbuilder-core/server/services/scraper.test.ts` - Tests for scraper service
-- `contentbuilder-core/server/services/claude.ts` - Claude API integration for text generation
-- `contentbuilder-core/server/services/claude.test.ts` - Tests for Claude service
-- `contentbuilder-core/server/services/imageGen.ts` - NanoBanana image generation
-- `contentbuilder-core/server/services/imageGen.test.ts` - Tests for image generation
-- `contentbuilder-core/server/services/whisper.ts` - OpenAI Whisper transcription
-- `contentbuilder-core/server/services/whisper.test.ts` - Tests for Whisper service
-- `contentbuilder-core/server/services/fileProcessor.ts` - PDF, DOCX, TXT parsing
-- `contentbuilder-core/server/services/fileProcessor.test.ts` - Tests for file processor
-- `contentbuilder-core/server/services/export.ts` - Export to Markdown, DOCX, ZIP
-- `contentbuilder-core/server/services/export.test.ts` - Tests for export service
+- `server/src/services/scraper.ts` - Website scraping using Playwright and color extraction with node-vibrant ✅
+- `server/src/services/scraper.test.ts` - Tests for scraper service (unit tests for utilities) ✅
+- `server/src/services/braveSearch.ts` - Brave Search API for company research ✅
+- `server/src/services/braveSearch.test.ts` - Tests for Brave Search service ✅
+- `server/src/services/claude.ts` - Claude API integration for text generation
+- `server/src/services/claude.test.ts` - Tests for Claude service
+- `server/src/services/imageGen.ts` - NanoBanana image generation
+- `server/src/services/imageGen.test.ts` - Tests for image generation
+- `server/src/services/whisper.ts` - OpenAI Whisper transcription
+- `server/src/services/whisper.test.ts` - Tests for Whisper service
+- `server/src/services/fileProcessor.ts` - PDF, DOCX, TXT parsing
+- `server/src/services/fileProcessor.test.ts` - Tests for file processor
+- `server/src/services/export.ts` - Export to Markdown, DOCX, ZIP
+- `server/src/services/export.test.ts` - Tests for export service
 
 ### API Routes
-- `contentbuilder-core/server/routes/scrape.ts` - POST /api/scrape endpoint
-- `contentbuilder-core/server/routes/generate.ts` - POST /api/generate/text, /api/generate/images
-- `contentbuilder-core/server/routes/transcribe.ts` - POST /api/transcribe endpoint
-- `contentbuilder-core/server/routes/process.ts` - POST /api/process/file, /api/process/url
-- `contentbuilder-core/server/routes/export.ts` - GET /api/export/:format endpoint
+- `server/src/routes/scrape.ts` - POST /api/scrape endpoint with rate limiting and caching ✅
+- `server/src/routes/generate.ts` - POST /api/generate/text, /api/generate/images
+- `server/src/routes/transcribe.ts` - POST /api/transcribe endpoint
+- `server/src/routes/process.ts` - POST /api/process/file, /api/process/url
+- `server/src/routes/export.ts` - GET /api/export/:format endpoint
 
 ### Frontend Updates
-- `contentbuilder-core/src/services/api.ts` - API client for backend calls
+- `contentbuilder-core/src/services/api.ts` - API client with typed ScrapeResponse interface ✅
+- `contentbuilder-core/src/pages/Settings.tsx` - Settings page calling real /api/scrape endpoint ✅
 - `contentbuilder-core/src/hooks/useAudioRecorder.ts` - MediaRecorder hook for voice input
 - `contentbuilder-core/src/hooks/useAudioRecorder.test.ts` - Tests for audio recorder
-- `contentbuilder-core/src/pages/Settings.tsx` - Update to call real scrape API
 - `contentbuilder-core/src/components/content-generator/ContentGenerator.tsx` - Update for real generation
 - `contentbuilder-core/src/components/content-generator/AIInterview.tsx` - Update for real voice input
 - `contentbuilder-core/src/components/content-generator/SourceMaterial.tsx` - Update for real file upload
@@ -131,25 +134,25 @@ The Lovable-generated codebase (`contentbuilder-core/`) provides a complete UI f
   - [x] 1.12 Add "Forgot Password" flow using `supabase.auth.resetPasswordForEmail()` *(Deferred)*
   - [x] 1.13 Test complete auth flow: login, session persistence on refresh, logout
 
-- [ ] 2.0 Implement Web Scraping & Company Research Service
+- [x] 2.0 Implement Web Scraping & Company Research Service
   *Create backend service to scrape customer websites for company information and auto-detect brand colors. Integrate with Brave Search API for company research.*
 
-  - [ ] 2.1 Install scraping dependencies in server: `cheerio`, `puppeteer` (or `playwright`), `color-thief-node`
-  - [ ] 2.2 Create `server/services/scraper.ts` with main `scrapeWebsite(url: string)` function
-  - [ ] 2.3 Implement HTML fetching with proper headers (User-Agent) and timeout handling
-  - [ ] 2.4 Extract page title, meta description, and Open Graph data from HTML
-  - [ ] 2.5 Implement CSS color extraction: parse stylesheets for primary/brand colors
-  - [ ] 2.6 Implement image-based color extraction using color-thief on logo/hero images
-  - [ ] 2.7 Create `server/services/braveSearch.ts` for company research API calls
-  - [ ] 2.8 Implement `searchCompanyInfo(companyName: string)` to get company background
-  - [ ] 2.9 Create `server/routes/scrape.ts` with POST `/api/scrape` endpoint
-  - [ ] 2.10 Endpoint should accept `{ url: string }` and return `{ profile: string, colors: { primary, secondary, accent } }`
-  - [ ] 2.11 Add input validation: URL format validation, allowed protocols (http/https only)
-  - [ ] 2.12 Implement rate limiting middleware to prevent abuse (e.g., 10 requests/minute per IP)
-  - [ ] 2.13 Add caching layer (in-memory or Redis) to avoid re-scraping same URLs within 24 hours
-  - [ ] 2.14 Update `Settings.tsx` to call `/api/scrape` instead of using mock data
-  - [ ] 2.15 Update loading states and error handling in frontend for real API calls
-  - [ ] 2.16 Write unit tests for scraper service with mocked HTTP responses
+  - [x] 2.1 Install scraping dependencies in server: `cheerio`, `playwright`, `node-vibrant` (using node-vibrant instead of color-thief-node due to native dependency issues)
+  - [x] 2.2 Create `server/services/scraper.ts` with main `scrapeWebsite(url: string)` function
+  - [x] 2.3 Implement HTML fetching with proper headers (User-Agent) and timeout handling
+  - [x] 2.4 Extract page title, meta description, and Open Graph data from HTML
+  - [x] 2.5 Implement CSS color extraction: parse computed styles for primary/brand colors
+  - [x] 2.6 Implement image-based color extraction using node-vibrant on logo/hero images
+  - [x] 2.7 Create `server/services/braveSearch.ts` for company research API calls
+  - [x] 2.8 Implement `searchCompanyInfo(companyName: string)` to get company background
+  - [x] 2.9 Create `server/routes/scrape.ts` with POST `/api/scrape` endpoint
+  - [x] 2.10 Endpoint accepts `{ url: string, includeResearch?: boolean }` and returns `{ success, data: { profile, colors, metadata }, cached }`
+  - [x] 2.11 Add input validation: URL format validation, allowed protocols (http/https only), SSRF protection
+  - [x] 2.12 Implement rate limiting middleware to prevent abuse (10 requests/minute per IP)
+  - [x] 2.13 Add caching layer (in-memory, 24-hour TTL) to avoid re-scraping same URLs
+  - [x] 2.14 Update `Settings.tsx` to call `/api/scrape` instead of using mock data
+  - [x] 2.15 Update loading states and error handling in frontend for real API calls
+  - [x] 2.16 Write unit tests for scraper service (29 tests passing)
 
 - [ ] 3.0 Integrate Claude API for Text Generation
   *Connect to Claude API for AI-powered content generation. Use customer context, brand voice settings, and page objectives to generate personalized content.*

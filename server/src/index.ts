@@ -4,6 +4,9 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 
+// Routes
+import scrapeRoutes from './routes/scrape';
+
 dotenv.config({ path: '../.env' });
 
 const app = express();
@@ -29,6 +32,9 @@ app.get('/api', (_req: Request, res: Response) => {
     endpoints: ['/api/health', '/api/scrape', '/api/generate', '/api/transcribe', '/api/export'],
   });
 });
+
+// API Routes
+app.use('/api/scrape', scrapeRoutes);
 
 // 404 handler
 app.use((_req: Request, res: Response) => {

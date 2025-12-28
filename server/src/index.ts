@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 
 // Routes
 import scrapeRoutes from './routes/scrape';
+import generateRoutes from './routes/generate';
 
 dotenv.config({ path: '../.env' });
 
@@ -35,6 +36,7 @@ app.get('/api', (_req: Request, res: Response) => {
 
 // API Routes
 app.use('/api/scrape', scrapeRoutes);
+app.use('/api/generate', generateRoutes);
 
 // 404 handler
 app.use((_req: Request, res: Response) => {

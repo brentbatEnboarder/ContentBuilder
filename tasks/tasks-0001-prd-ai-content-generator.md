@@ -52,8 +52,9 @@ The Lovable-generated codebase (`contentbuilder-core/`) provides a complete UI f
 - `server/src/services/scraper.test.ts` - Tests for scraper service (unit tests for utilities) ✅
 - `server/src/services/braveSearch.ts` - Brave Search API for company research ✅
 - `server/src/services/braveSearch.test.ts` - Tests for Brave Search service ✅
-- `server/src/services/claude.ts` - Claude API integration for text generation
-- `server/src/services/claude.test.ts` - Tests for Claude service
+- `server/src/services/claude.ts` - Claude API integration for text generation ✅
+- `server/src/services/claude.test.ts` - Tests for Claude service (14 tests for prompt building and voice settings) ✅
+- `server/src/services/voiceData.ts` - Voice dimension data for server-side prompt building ✅
 - `server/src/services/imageGen.ts` - NanoBanana image generation
 - `server/src/services/imageGen.test.ts` - Tests for image generation
 - `server/src/services/whisper.ts` - OpenAI Whisper transcription
@@ -65,7 +66,7 @@ The Lovable-generated codebase (`contentbuilder-core/`) provides a complete UI f
 
 ### API Routes
 - `server/src/routes/scrape.ts` - POST /api/scrape endpoint with rate limiting and caching ✅
-- `server/src/routes/generate.ts` - POST /api/generate/text, /api/generate/images
+- `server/src/routes/generate.ts` - POST /api/generate/text (streaming), /api/generate/interview ✅
 - `server/src/routes/transcribe.ts` - POST /api/transcribe endpoint
 - `server/src/routes/process.ts` - POST /api/process/file, /api/process/url
 - `server/src/routes/export.ts` - GET /api/export/:format endpoint
@@ -154,25 +155,25 @@ The Lovable-generated codebase (`contentbuilder-core/`) provides a complete UI f
   - [x] 2.15 Update loading states and error handling in frontend for real API calls
   - [x] 2.16 Write unit tests for scraper service (29 tests passing)
 
-- [ ] 3.0 Integrate Claude API for Text Generation
+- [x] 3.0 Integrate Claude API for Text Generation
   *Connect to Claude API for AI-powered content generation. Use customer context, brand voice settings, and page objectives to generate personalized content.*
 
-  - [ ] 3.1 Install Anthropic SDK in server: `@anthropic-ai/sdk`
-  - [ ] 3.2 Create `server/services/claude.ts` with Claude client initialization
-  - [ ] 3.3 Design system prompt template that incorporates company profile and brand context
-  - [ ] 3.4 Create `buildVoicePrompt()` function to convert voice slider values (0-4) to natural language instructions
-  - [ ] 3.5 Create `generateContent()` function accepting objective, context, voice settings, and source materials
-  - [ ] 3.6 Implement proper message formatting for Claude API (system, user, assistant roles)
-  - [ ] 3.7 Create `server/routes/generate.ts` with POST `/api/generate/text` endpoint
-  - [ ] 3.8 Endpoint should accept `{ objective, companyProfile, voiceSettings, imageStyle, sourceMaterials }`
-  - [ ] 3.9 Implement streaming response using Claude's streaming API for real-time text display
-  - [ ] 3.10 Update frontend `ContentGenerator.tsx` to call `/api/generate/text` API
-  - [ ] 3.11 Implement streaming text display in `GeneratedText.tsx` component
-  - [ ] 3.12 Create `generateInterviewQuestion()` function for AI interview follow-up questions
-  - [ ] 3.13 Update `AIInterview.tsx` to use real Claude responses instead of mock messages
-  - [ ] 3.14 Implement content regeneration: POST `/api/generate/text` with feedback parameter
-  - [ ] 3.15 Add error handling for API rate limits, token limits, and network failures
-  - [ ] 3.16 Write unit tests for prompt building and voice settings conversion
+  - [x] 3.1 Install Anthropic SDK in server: `@anthropic-ai/sdk` *(Already installed in package.json)*
+  - [x] 3.2 Create `server/services/claude.ts` with Claude client initialization
+  - [x] 3.3 Design system prompt template that incorporates company profile and brand context
+  - [x] 3.4 Create `buildVoicePrompt()` function to convert voice slider values (0-4) to natural language instructions
+  - [x] 3.5 Create `generateContent()` function accepting objective, context, voice settings, and source materials
+  - [x] 3.6 Implement proper message formatting for Claude API (system, user, assistant roles)
+  - [x] 3.7 Create `server/routes/generate.ts` with POST `/api/generate/text` endpoint
+  - [x] 3.8 Endpoint should accept `{ objective, companyProfile, voiceSettings, imageStyle, sourceMaterials }`
+  - [x] 3.9 Implement streaming response using Claude's streaming API for real-time text display
+  - [x] 3.10 Update frontend `ContentGenerator.tsx` to call `/api/generate/text` API
+  - [x] 3.11 Implement streaming text display in `GeneratedText.tsx` component
+  - [x] 3.12 Create `generateInterviewQuestion()` function for AI interview follow-up questions
+  - [x] 3.13 Update `AIInterview.tsx` to use real Claude responses instead of mock messages
+  - [x] 3.14 Implement content regeneration: POST `/api/generate/text` with feedback parameter
+  - [x] 3.15 Add error handling for API rate limits, token limits, and network failures
+  - [x] 3.16 Write unit tests for prompt building and voice settings conversion (14 tests passing)
 
 - [ ] 4.0 Integrate NanoBanana API for Image Generation
   *Connect to NanoBanana Pro API for AI image generation. Apply selected image style presets and custom prompts to generate relevant visuals.*

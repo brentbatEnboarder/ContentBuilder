@@ -48,7 +48,7 @@ The Lovable-generated codebase (`contentbuilder-core/`) provides a complete UI f
 - `src/pages/Login.tsx` - Login page with error handling ✅
 
 ### Backend Services
-- `server/src/services/scraper.ts` - Website scraping using Playwright and color extraction with node-vibrant ✅
+- `server/src/services/scraper.ts` - Website scraping using Firecrawl API and color extraction with node-vibrant ✅
 - `server/src/services/scraper.test.ts` - Tests for scraper service (unit tests for utilities) ✅
 - `server/src/services/braveSearch.ts` - Brave Search API for company research ✅
 - `server/src/services/braveSearch.test.ts` - Tests for Brave Search service ✅
@@ -137,7 +137,7 @@ The Lovable-generated codebase (`contentbuilder-core/`) provides a complete UI f
 - [x] 2.0 Implement Web Scraping & Company Research Service
   *Create backend service to scrape customer websites for company information and auto-detect brand colors. Integrate with Brave Search API for company research.*
 
-  - [x] 2.1 Install scraping dependencies in server: `cheerio`, `playwright`, `node-vibrant` (using node-vibrant instead of color-thief-node due to native dependency issues)
+  - [x] 2.1 Install scraping dependencies in server: `@mendable/firecrawl-js`, `node-vibrant` (using Firecrawl for scraping, node-vibrant for color extraction)
   - [x] 2.2 Create `server/services/scraper.ts` with main `scrapeWebsite(url: string)` function
   - [x] 2.3 Implement HTML fetching with proper headers (User-Agent) and timeout handling
   - [x] 2.4 Extract page title, meta description, and Open Graph data from HTML

@@ -1,5 +1,4 @@
-import { chromium, Browser, Page } from 'playwright';
-import * as cheerio from 'cheerio';
+import FirecrawlApp from '@mendable/firecrawl-js';
 import { Vibrant } from 'node-vibrant/node';
 
 export interface ScrapedColors {
@@ -26,55 +25,56 @@ export interface ScrapeResult {
   scrapedAt: string;
 }
 
-const USER_AGENT =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+// Lazy-initialized Firecrawl client (to avoid errors during test imports)
+let firecrawlClient: FirecrawlApp | null = null;
 
-const DEFAULT_TIMEOUT = 30000;
+function getFirecrawlClient(): FirecrawlApp {
+  if (!process.env.FIRECRAWL_API_KEY) {
+    throw new ScraperError('FIRECRAWL_API_KEY not configured', 'CONFIG_ERROR');
+  }
+
+  if (!firecrawlClient) {
+    firecrawlClient = new FirecrawlApp({
+      apiKey: process.env.FIRECRAWL_API_KEY,
+    });
+  }
+
+  return firecrawlClient;
+}
 
 /**
- * Main scraping function - fetches website and extracts company profile and brand colors
+ * Main scraping function - uses Firecrawl to fetch website and extract company profile and brand colors
  */
 export async function scrapeWebsite(url: string): Promise<ScrapeResult> {
   // Validate and normalize URL
   const normalizedUrl = normalizeUrl(url);
 
-  let browser: Browser | null = null;
+  // Get Firecrawl client (throws if API key not configured)
+  const firecrawl = getFirecrawlClient();
 
   try {
-    browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({
-      userAgent: USER_AGENT,
-      viewport: { width: 1920, height: 1080 },
+    // Scrape the website using Firecrawl
+    // The scrape method returns a Document directly, throws on error
+    const document = await firecrawl.scrape(normalizedUrl, {
+      formats: ['markdown', 'html'],
     });
 
-    const page = await context.newPage();
-    await page.goto(normalizedUrl, {
-      waitUntil: 'domcontentloaded',
-      timeout: DEFAULT_TIMEOUT
-    });
+    // Extract metadata from Firecrawl response
+    const metadata: ScrapedMetadata = {
+      title: document.metadata?.title || null,
+      description: document.metadata?.description || null,
+      ogTitle: document.metadata?.ogTitle || null,
+      ogDescription: document.metadata?.ogDescription || null,
+      ogImage: document.metadata?.ogImage || null,
+      favicon: document.metadata?.favicon || null,
+      logoUrl: null, // Firecrawl doesn't extract logo URL specifically
+    };
 
-    // Wait a bit for JS to render
-    await page.waitForTimeout(2000);
-
-    const html = await page.content();
-    const $ = cheerio.load(html);
-
-    // Extract metadata
-    const metadata = extractMetadata($, normalizedUrl);
-
-    // Extract colors from CSS
-    const cssColors = await extractCssColors(page);
-
-    // Extract colors from images (logo/hero)
-    const imageColors = await extractImageColors(metadata.logoUrl || metadata.ogImage, normalizedUrl);
-
-    // Merge color sources (prefer CSS colors, fall back to image colors)
-    const colors = mergeColors(cssColors, imageColors);
+    // Extract colors from the OG image using node-vibrant
+    const colors = await extractImageColors(metadata.ogImage);
 
     // Build company profile from metadata
     const profile = buildCompanyProfile(metadata, normalizedUrl);
-
-    await browser.close();
 
     return {
       url: normalizedUrl,
@@ -84,8 +84,8 @@ export async function scrapeWebsite(url: string): Promise<ScrapeResult> {
       scrapedAt: new Date().toISOString(),
     };
   } catch (error) {
-    if (browser) {
-      await browser.close();
+    if (error instanceof ScraperError) {
+      throw error;
     }
     throw new ScraperError(
       `Failed to scrape ${url}: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -116,130 +116,12 @@ export function normalizeUrl(url: string): string {
 }
 
 /**
- * Extract metadata from HTML using Cheerio
- */
-function extractMetadata($: cheerio.CheerioAPI, baseUrl: string): ScrapedMetadata {
-  const title = $('title').text().trim() || null;
-  const description = $('meta[name="description"]').attr('content')?.trim() || null;
-  const ogTitle = $('meta[property="og:title"]').attr('content')?.trim() || null;
-  const ogDescription = $('meta[property="og:description"]').attr('content')?.trim() || null;
-  const ogImage = resolveUrl($('meta[property="og:image"]').attr('content'), baseUrl);
-
-  // Find favicon
-  const faviconHref = $('link[rel="icon"]').attr('href') ||
-                      $('link[rel="shortcut icon"]').attr('href') ||
-                      '/favicon.ico';
-  const favicon = resolveUrl(faviconHref, baseUrl);
-
-  // Try to find logo
-  const logoUrl = findLogoUrl($, baseUrl);
-
-  return { title, description, ogTitle, ogDescription, ogImage, favicon, logoUrl };
-}
-
-/**
- * Find logo URL from common patterns
- */
-function findLogoUrl($: cheerio.CheerioAPI, baseUrl: string): string | null {
-  // Common logo selectors
-  const logoSelectors = [
-    'img[class*="logo"]',
-    'img[id*="logo"]',
-    'img[alt*="logo" i]',
-    'a[class*="logo"] img',
-    'header img:first-of-type',
-    '.header img:first-of-type',
-    '#header img:first-of-type',
-    'nav img:first-of-type',
-  ];
-
-  for (const selector of logoSelectors) {
-    const logoSrc = $(selector).first().attr('src');
-    if (logoSrc) {
-      return resolveUrl(logoSrc, baseUrl);
-    }
-  }
-
-  return null;
-}
-
-/**
- * Resolve relative URL to absolute
- */
-function resolveUrl(url: string | undefined, baseUrl: string): string | null {
-  if (!url) return null;
-
-  try {
-    return new URL(url, baseUrl).href;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Extract colors from CSS computed styles
- */
-async function extractCssColors(page: Page): Promise<Partial<ScrapedColors>> {
-  const colors = await page.evaluate(() => {
-    const extractedColors: string[] = [];
-
-    // Get computed styles from key elements
-    const elements = [
-      document.querySelector('header'),
-      document.querySelector('nav'),
-      document.querySelector('.header'),
-      document.querySelector('#header'),
-      document.querySelector('a'),
-      document.querySelector('button'),
-      document.querySelector('.btn'),
-      document.querySelector('.button'),
-    ].filter(Boolean) as HTMLElement[];
-
-    for (const el of elements) {
-      const styles = window.getComputedStyle(el);
-      const bgColor = styles.backgroundColor;
-      const color = styles.color;
-
-      // Filter out transparent and common defaults
-      if (bgColor && !bgColor.includes('rgba(0, 0, 0, 0)') && bgColor !== 'transparent') {
-        extractedColors.push(bgColor);
-      }
-      if (color && color !== 'rgb(0, 0, 0)' && color !== 'rgb(255, 255, 255)') {
-        extractedColors.push(color);
-      }
-    }
-
-    // Also check CSS custom properties on :root
-    const rootStyles = window.getComputedStyle(document.documentElement);
-    const cssVarNames = ['--primary', '--secondary', '--accent', '--brand', '--main-color'];
-    for (const varName of cssVarNames) {
-      const value = rootStyles.getPropertyValue(varName).trim();
-      if (value) {
-        extractedColors.push(value);
-      }
-    }
-
-    return extractedColors;
-  });
-
-  // Deduplicate and convert to hex
-  const hexColors = [...new Set(colors)]
-    .map(rgbToHex)
-    .filter((c): c is string => c !== null)
-    .filter(c => !isGrayscale(c));
-
-  return {
-    primary: hexColors[0] || null,
-    secondary: hexColors[1] || null,
-    accent: hexColors[2] || null,
-  };
-}
-
-/**
  * Extract colors from images using node-vibrant
  */
-async function extractImageColors(imageUrl: string | null, baseUrl: string): Promise<Partial<ScrapedColors>> {
-  if (!imageUrl) return {};
+async function extractImageColors(imageUrl: string | null): Promise<ScrapedColors> {
+  if (!imageUrl) {
+    return { primary: null, secondary: null, accent: null };
+  }
 
   try {
     const palette = await Vibrant.from(imageUrl).getPalette();
@@ -251,75 +133,8 @@ async function extractImageColors(imageUrl: string | null, baseUrl: string): Pro
     };
   } catch (error) {
     console.warn(`Failed to extract colors from image ${imageUrl}:`, error);
-    return {};
+    return { primary: null, secondary: null, accent: null };
   }
-}
-
-/**
- * Merge color sources, preferring CSS colors
- */
-function mergeColors(
-  cssColors: Partial<ScrapedColors>,
-  imageColors: Partial<ScrapedColors>
-): ScrapedColors {
-  return {
-    primary: cssColors.primary || imageColors.primary || null,
-    secondary: cssColors.secondary || imageColors.secondary || null,
-    accent: cssColors.accent || imageColors.accent || null,
-  };
-}
-
-/**
- * Convert RGB color string to hex
- */
-function rgbToHex(rgb: string): string | null {
-  // Handle hex format already
-  if (rgb.startsWith('#')) {
-    return rgb.toUpperCase();
-  }
-
-  // Parse rgb/rgba format
-  const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-  if (!match) return null;
-
-  const [, r, g, b] = match.map(Number);
-  return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
-}
-
-/**
- * Check if a hex color is grayscale (black/white/gray)
- */
-function isGrayscale(hex: string): boolean {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return false;
-
-  // Check if all channels are similar (grayscale)
-  const maxDiff = Math.max(
-    Math.abs(rgb.r - rgb.g),
-    Math.abs(rgb.g - rgb.b),
-    Math.abs(rgb.r - rgb.b)
-  );
-
-  // Also check for near-white or near-black
-  const avg = (rgb.r + rgb.g + rgb.b) / 3;
-  const isNearWhite = avg > 240;
-  const isNearBlack = avg < 15;
-
-  return maxDiff < 10 || isNearWhite || isNearBlack;
-}
-
-/**
- * Convert hex to RGB object
- */
-function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16),
-      }
-    : null;
 }
 
 /**
@@ -349,7 +164,7 @@ function buildCompanyProfile(metadata: ScrapedMetadata, url: string): string {
 /**
  * Extract company name from page title or URL
  */
-function extractCompanyName(title: string | null, url: string): string {
+export function extractCompanyName(title: string | null, url: string): string {
   if (title) {
     // Remove common suffixes like "| Home", "- Official Site", etc.
     const cleaned = title

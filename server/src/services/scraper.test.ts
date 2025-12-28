@@ -1,7 +1,4 @@
-import { normalizeUrl, ScraperError } from './scraper';
-
-// Note: Full integration tests for scrapeWebsite require a running browser.
-// These unit tests focus on the utility functions and edge cases.
+import { normalizeUrl, extractCompanyName, ScraperError } from './scraper';
 
 describe('scraper', () => {
   describe('normalizeUrl', () => {
@@ -49,109 +46,37 @@ describe('scraper', () => {
       expect(error instanceof Error).toBe(true);
     });
   });
-});
 
-// Helper function tests
-describe('color utilities', () => {
-  // These test the helper functions that are not exported
-  // We test them indirectly through the main function or by extracting them
-
-  describe('hex color validation', () => {
-    const isValidHex = (hex: string): boolean => {
-      return /^#[0-9A-Fa-f]{6}$/.test(hex);
-    };
-
-    it('should validate correct hex colors', () => {
-      expect(isValidHex('#FF0000')).toBe(true);
-      expect(isValidHex('#00ff00')).toBe(true);
-      expect(isValidHex('#0000FF')).toBe(true);
+  describe('extractCompanyName', () => {
+    it('should extract company name from simple title', () => {
+      expect(extractCompanyName('Acme Corp', 'https://acme.com')).toBe('Acme Corp');
     });
 
-    it('should reject invalid hex colors', () => {
-      expect(isValidHex('FF0000')).toBe(false); // Missing #
-      expect(isValidHex('#FFF')).toBe(false); // Too short
-      expect(isValidHex('#GGGGGG')).toBe(false); // Invalid chars
-    });
-  });
-
-  describe('grayscale detection', () => {
-    // Mock the isGrayscale logic
-    const isGrayscale = (hex: string): boolean => {
-      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      if (!result) return false;
-
-      const r = parseInt(result[1], 16);
-      const g = parseInt(result[2], 16);
-      const b = parseInt(result[3], 16);
-
-      const maxDiff = Math.max(
-        Math.abs(r - g),
-        Math.abs(g - b),
-        Math.abs(r - b)
-      );
-
-      const avg = (r + g + b) / 3;
-      const isNearWhite = avg > 240;
-      const isNearBlack = avg < 15;
-
-      return maxDiff < 10 || isNearWhite || isNearBlack;
-    };
-
-    it('should detect grayscale colors', () => {
-      expect(isGrayscale('#000000')).toBe(true); // Black
-      expect(isGrayscale('#FFFFFF')).toBe(true); // White
-      expect(isGrayscale('#808080')).toBe(true); // Gray
-      expect(isGrayscale('#F5F5F5')).toBe(true); // Near white
+    it('should remove common suffixes from title', () => {
+      expect(extractCompanyName('Acme Corp | Home', 'https://acme.com')).toBe('Acme Corp');
+      expect(extractCompanyName('Acme Corp - Official Website', 'https://acme.com')).toBe('Acme Corp');
     });
 
-    it('should not flag colorful colors as grayscale', () => {
-      expect(isGrayscale('#FF0000')).toBe(false); // Red
-      expect(isGrayscale('#00FF00')).toBe(false); // Green
-      expect(isGrayscale('#0000FF')).toBe(false); // Blue
-      expect(isGrayscale('#3B82F6')).toBe(false); // Brand blue
+    it('should fall back to domain name when title is null', () => {
+      expect(extractCompanyName(null, 'https://example.com')).toBe('Example');
+      expect(extractCompanyName(null, 'https://www.mycompany.com')).toBe('Mycompany');
     });
-  });
-});
 
-describe('company name extraction', () => {
-  // Mock the extractCompanyName logic
-  const extractCompanyName = (title: string | null, url: string): string => {
-    if (title) {
-      const cleaned = title
-        .split(/[|\-–—]/)[0]
-        .replace(/home|official|website|site/gi, '')
-        .trim();
+    it('should fall back to domain name when title is empty', () => {
+      expect(extractCompanyName('', 'https://example.com')).toBe('Example');
+    });
 
-      if (cleaned.length > 0 && cleaned.length < 50) {
-        return cleaned;
-      }
-    }
+    it('should handle complex titles', () => {
+      expect(extractCompanyName('TechCo | Enterprise Software', 'https://techco.io')).toBe('TechCo');
+      expect(extractCompanyName('BigCorp – Leading the Way', 'https://bigcorp.com')).toBe('BigCorp');
+    });
 
-    try {
-      const hostname = new URL(url).hostname;
-      const domain = hostname.replace(/^www\./, '').split('.')[0];
-      return domain.charAt(0).toUpperCase() + domain.slice(1);
-    } catch {
-      return 'Unknown Company';
-    }
-  };
+    it('should handle titles with em-dash separators', () => {
+      expect(extractCompanyName('Company Name — Tagline', 'https://company.com')).toBe('Company Name');
+    });
 
-  it('should extract company name from simple title', () => {
-    expect(extractCompanyName('Acme Corp', 'https://acme.com')).toBe('Acme Corp');
-  });
-
-  it('should remove common suffixes from title', () => {
-    expect(extractCompanyName('Acme Corp | Home', 'https://acme.com')).toBe('Acme Corp');
-    expect(extractCompanyName('Acme Corp - Official Website', 'https://acme.com')).toBe('Acme Corp');
-  });
-
-  it('should fall back to domain name', () => {
-    expect(extractCompanyName(null, 'https://example.com')).toBe('Example');
-    expect(extractCompanyName('', 'https://www.mycompany.com')).toBe('Mycompany');
-  });
-
-  it('should handle complex titles', () => {
-    expect(extractCompanyName('TechCo | Enterprise Software', 'https://techco.io')).toBe('TechCo');
-    expect(extractCompanyName('BigCorp – Leading the Way', 'https://bigcorp.com')).toBe('BigCorp');
+    it('should return Unknown Company for invalid URL', () => {
+      expect(extractCompanyName(null, 'invalid')).toBe('Unknown Company');
+    });
   });
 });

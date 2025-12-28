@@ -64,7 +64,7 @@ export async function searchCompanyInfo(companyName: string): Promise<CompanyRes
       );
     }
 
-    const data: BraveApiResponse = await response.json();
+    const data = await response.json() as BraveApiResponse;
     const webResults = data.web?.results || [];
 
     // Extract search results
@@ -180,7 +180,7 @@ export async function searchCompanyNews(companyName: string): Promise<BraveSearc
       return [];
     }
 
-    const data: BraveApiResponse = await response.json();
+    const data = await response.json() as BraveApiResponse;
     const webResults = data.web?.results || [];
 
     return webResults.map((r) => ({

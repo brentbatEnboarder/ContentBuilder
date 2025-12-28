@@ -36,7 +36,7 @@ cd server && npm run test:watch    # Jest watch mode
 ### Monorepo Structure
 - **`/src`** - React frontend (Vite + TypeScript)
 - **`/server`** - Express backend (TypeScript, separate package.json)
-- **`/contentbuilder-core`** - Lovable-generated UI reference (NOT tracked in git)
+- **`/contentbuilder-core`** - Lovable-generated UI (separate git repo)
 
 ### Frontend (`/src`)
 - **`/contexts/AuthContext.tsx`** - Supabase auth state (login, logout, session)
@@ -47,14 +47,17 @@ cd server && npm run test:watch    # Jest watch mode
 
 ### Backend (`/server/src`)
 - **`index.ts`** - Express server with CORS, helmet, morgan
-- **`/routes/`** - API endpoints (scrape, generate, transcribe, export)
-- **`/services/`** - Business logic (Claude, OpenAI, Firecrawl integrations)
+- **`/routes/scrape.ts`** - POST /api/scrape (website scraping with rate limiting & caching)
+- **`/services/scraper.ts`** - Firecrawl-based website scraping + node-vibrant color extraction
+- **`/services/braveSearch.ts`** - Company research via Brave Search API
 
 ### Key Integrations
 - **Supabase** - Auth + database (project: "Prototypes", id: `gosgvisonkpkpsztbeok`)
-- **Claude API** - Text generation via `@anthropic-ai/sdk`
-- **OpenAI Whisper** - Speech-to-text via `openai` SDK
-- **Firecrawl** - Web scraping via `@mendable/firecrawl-js`
+- **Firecrawl** - Web scraping via `@mendable/firecrawl-js` (extracts metadata, handles JS rendering)
+- **node-vibrant** - Color extraction from OG images
+- **Brave Search** - Company research and industry inference
+- **Claude API** - Text generation via `@anthropic-ai/sdk` (to be implemented)
+- **OpenAI Whisper** - Speech-to-text via `openai` SDK (to be implemented)
 - **NanoBanana Pro** - Image generation (to be implemented)
 
 ## Coding Patterns
@@ -76,18 +79,22 @@ const { user, login, logout, loading } = useAuth();
 ### API Client Pattern
 ```tsx
 import { apiClient } from '@/services/api';
-const result = await apiClient.health();
+const result = await apiClient.scrape('https://example.com');
 ```
 
 ## Environment Variables
 
 Required in `.env` (copy from `.env.example`):
 ```
+# Frontend (Vite)
 VITE_SUPABASE_URL=https://gosgvisonkpkpsztbeok.supabase.co
 VITE_SUPABASE_ANON_KEY=...
-ANTHROPIC_API_KEY=...
-OPENAI_API_KEY=...
-FIRECRAWL_API_KEY=...
+
+# Backend
+FIRECRAWL_API_KEY=...          # Required for website scraping
+BRAVE_API_KEY=...              # Optional for company research
+ANTHROPIC_API_KEY=...          # Required for text generation
+OPENAI_API_KEY=...             # Required for voice transcription
 ```
 
 ## Task Tracking
@@ -97,3 +104,13 @@ Active tasks are tracked in `/tasks/tasks-0001-prd-ai-content-generator.md`. Fol
 2. Mark subtasks `[x]` as completed
 3. Run tests before committing
 4. Ask for approval before starting next parent task
+
+## Current Status
+
+**Completed:**
+- Task 0.0: Project infrastructure & dependencies
+- Task 1.0: Supabase authentication
+- Task 2.0: Web scraping & company research (Firecrawl + Brave Search)
+
+**Next:**
+- Task 3.0: Claude API text generation

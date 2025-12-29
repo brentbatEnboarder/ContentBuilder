@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { Page, ChatMessage } from '@/types/page';
 import { usePages } from './usePages';
+import { apiClient } from '@/services/api';
 
 interface PageEditorState {
   page: Page | null;
@@ -87,18 +88,28 @@ export const usePageEditor = (pageId: string | null) => {
     const isNewPage = state.page.id.startsWith('temp_');
 
     if (isNewPage) {
-      // Create new page
-      const created = await createPage(state.page.title);
+      // For new pages with default title, try to generate a better one from content
+      let pageTitle = state.page.title;
+      if (pageTitle === 'Untitled Page' && state.generatedContent.text) {
+        try {
+          pageTitle = await apiClient.generateTitle(state.generatedContent.text);
+        } catch {
+          // Keep default title on error
+        }
+      }
+
+      // Create new page with (possibly generated) title
+      const created = await createPage(pageTitle);
       await updatePage(created.id, {
         content: state.generatedContent,
         chatHistory: state.page.chatHistory,
       });
       setState(prev => ({
         ...prev,
-        page: { ...prev.page!, id: created.id },
+        page: { ...prev.page!, id: created.id, title: pageTitle },
         isDirty: false,
       }));
-      return { ...state.page, id: created.id };
+      return { ...state.page, id: created.id, title: pageTitle };
     } else {
       // Update existing page
       await updatePage(state.page.id, {

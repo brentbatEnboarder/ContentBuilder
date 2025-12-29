@@ -6,13 +6,29 @@ interface ChatPaneProps {
   messages: ChatMessageType[];
   isLoading: boolean;
   onSendMessage: (message: string, attachments?: FileAttachment[]) => void;
+  hasContent?: boolean;
+  isGeneratingImages?: boolean;
+  onGenerateImages?: () => void;
 }
 
-export const ChatPane = ({ messages, isLoading, onSendMessage }: ChatPaneProps) => {
+export const ChatPane = ({
+  messages,
+  isLoading,
+  onSendMessage,
+  hasContent,
+  isGeneratingImages,
+  onGenerateImages,
+}: ChatPaneProps) => {
   return (
     <div className="flex flex-col h-full bg-card border-r border-border">
       <ChatMessages messages={messages} isLoading={isLoading} />
-      <ChatInput onSend={onSendMessage} disabled={isLoading} />
+      <ChatInput
+        onSend={onSendMessage}
+        disabled={isLoading}
+        hasContent={hasContent}
+        isGeneratingImages={isGeneratingImages}
+        onGenerateImages={onGenerateImages}
+      />
     </div>
   );
 };

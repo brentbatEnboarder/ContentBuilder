@@ -56,6 +56,21 @@ export interface GenerateContentResult {
   };
 }
 
+// Image planning types
+export interface ImageRecommendation {
+  id: string;
+  type: 'header' | 'body';
+  title: string;
+  description: string;
+  aspectRatio: '2:1' | '1:1' | '16:9' | '4:3' | '3:4' | '3:2';
+  placement: 'top' | 'bottom';
+}
+
+export interface ImagePlanResponse {
+  recommendations: ImageRecommendation[];
+  message: string; // The conversational message to show in chat
+}
+
 export interface InterviewContext {
   objective: string;
   companyProfile: CompanyProfile;
@@ -409,6 +424,282 @@ Keep questions conversational and concise. Don't ask more than 2 questions at on
     throw new ClaudeError(
       `Interview generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       'INTERVIEW_FAILED'
+    );
+  }
+}
+
+/**
+ * Generate a concise page title from content
+ */
+export async function generateTitle(content: string): Promise<string> {
+  const client = getClaudeClient();
+
+  // Truncate content if too long (we only need enough to understand the gist)
+  const truncatedContent = content.slice(0, 2000);
+
+  const systemPrompt = `You are a title generator. Given some content, generate a short, descriptive title that captures the essence of the content.
+
+Rules:
+- Keep the title under 50 characters
+- Be specific and descriptive
+- Don't use generic titles like "Content" or "Document"
+- Don't use quotes around the title
+- Just return the title, nothing else`;
+
+  try {
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 100,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: `Generate a title for this content:\n\n${truncatedContent}`,
+        },
+      ],
+    });
+
+    const textContent = response.content.find((block) => block.type === 'text');
+    if (!textContent || textContent.type !== 'text') {
+      return 'Untitled Page';
+    }
+
+    // Clean up the title (remove quotes if present, trim whitespace)
+    let title = textContent.text.trim();
+    title = title.replace(/^["']|["']$/g, ''); // Remove surrounding quotes
+    title = title.slice(0, 50); // Enforce max length
+
+    return title || 'Untitled Page';
+  } catch (error) {
+    console.error('Title generation failed:', error);
+    return 'Untitled Page';
+  }
+}
+
+/**
+ * Analyze content and recommend images
+ */
+export interface ImagePlanRequest {
+  content: string;
+  companyProfile: CompanyProfile;
+  imageStyle: string;
+  conversationHistory?: { role: 'user' | 'assistant'; content: string }[];
+  currentPlan?: ImageRecommendation[];
+}
+
+export async function analyzeContentForImages(
+  request: ImagePlanRequest
+): Promise<ImagePlanResponse> {
+  const client = getClaudeClient();
+
+  const systemPrompt = `You are an image planning assistant for content creation. Your job is to analyze content and recommend appropriate images.
+
+## Company Context
+${request.companyProfile.companyProfile || 'No company profile provided'}
+Brand Colors: Primary ${request.companyProfile.brandColors.primary}, Secondary ${request.companyProfile.brandColors.secondary}
+Image Style: ${request.imageStyle || 'corporate'}
+
+## Your Task
+Analyze the provided content and recommend images that would enhance it. You should:
+
+1. **Almost always recommend a header image** - This goes at the top of the content and sets the visual tone.
+   - Header images should use a 2:1 (panoramic) aspect ratio
+   - The title should be concise (3-6 words)
+   - The description should capture the essence (1 sentence)
+
+2. **Recommend body images when appropriate** - Based on the content, you may recommend additional images.
+   - Consider diagrams, illustrations, or photos that would break up the text
+   - Choose appropriate aspect ratios:
+     - 16:9 for wide scenes
+     - 4:3 for standard images
+     - 3:4 for portrait/tall content (diagrams, infographics)
+     - 1:1 for icons or square content
+
+## Response Format
+You MUST respond with a JSON block inside <image-plan> tags, followed by a conversational message.
+
+<image-plan>
+[
+  {
+    "id": "img_1",
+    "type": "header",
+    "title": "Short descriptive title",
+    "description": "Brief description of what the image should show",
+    "aspectRatio": "2:1",
+    "placement": "top"
+  },
+  {
+    "id": "img_2",
+    "type": "body",
+    "title": "Another image title",
+    "description": "What this image should depict",
+    "aspectRatio": "16:9",
+    "placement": "bottom"
+  }
+]
+</image-plan>
+
+After the JSON, write a friendly message summarizing your recommendations and asking if the user wants to make changes or proceed.
+
+Example message: "I recommend 2 images for your content: a header showing [X] and a supporting image illustrating [Y]. Would you like to adjust any of these, or shall I go ahead and generate them?"`;
+
+  const messages: Anthropic.MessageParam[] = [];
+
+  // Add conversation history if present
+  if (request.conversationHistory && request.conversationHistory.length > 0) {
+    for (const msg of request.conversationHistory) {
+      messages.push({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: msg.content,
+      });
+    }
+  }
+
+  // Add the current request
+  let userMessage = `Please analyze this content and recommend images:\n\n${request.content}`;
+
+  if (request.currentPlan && request.currentPlan.length > 0) {
+    userMessage += `\n\nCurrent image plan:\n${JSON.stringify(request.currentPlan, null, 2)}`;
+  }
+
+  messages.push({ role: 'user', content: userMessage });
+
+  try {
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      system: systemPrompt,
+      messages,
+    });
+
+    const textContent = response.content.find((block) => block.type === 'text');
+    if (!textContent || textContent.type !== 'text') {
+      throw new ClaudeError('No text in response', 'INVALID_RESPONSE');
+    }
+
+    const fullResponse = textContent.text;
+
+    // Parse the image plan from the response
+    const planMatch = fullResponse.match(/<image-plan>([\s\S]*?)<\/image-plan>/);
+    let recommendations: ImageRecommendation[] = [];
+    let message = fullResponse;
+
+    if (planMatch) {
+      try {
+        recommendations = JSON.parse(planMatch[1].trim());
+        // Remove the image-plan tags from the message
+        message = fullResponse.replace(/<image-plan>[\s\S]*?<\/image-plan>/g, '').trim();
+      } catch (parseError) {
+        console.error('Failed to parse image plan JSON:', parseError);
+        // Continue with empty recommendations
+      }
+    }
+
+    return {
+      recommendations,
+      message,
+    };
+  } catch (error) {
+    if (error instanceof ClaudeError) {
+      throw error;
+    }
+
+    throw new ClaudeError(
+      `Image analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      'IMAGE_ANALYSIS_FAILED'
+    );
+  }
+}
+
+/**
+ * Continue image planning conversation
+ */
+export async function continueImagePlanning(
+  request: ImagePlanRequest & { userMessage: string }
+): Promise<ImagePlanResponse> {
+  const client = getClaudeClient();
+
+  const systemPrompt = `You are an image planning assistant. The user is refining their image recommendations.
+
+## Company Context
+${request.companyProfile.companyProfile || 'No company profile provided'}
+Brand Colors: Primary ${request.companyProfile.brandColors.primary}
+Image Style: ${request.imageStyle || 'corporate'}
+
+## Current Image Plan
+${JSON.stringify(request.currentPlan || [], null, 2)}
+
+## Content Being Illustrated
+${request.content.slice(0, 2000)}
+
+## Instructions
+- If the user wants to modify images, update the plan accordingly
+- If the user says "go ahead", "generate", "looks good", "yes", or similar approval, respond with the SAME plan and a confirmation message
+- Always include the <image-plan> JSON block with the current/updated recommendations
+- Keep aspect ratios appropriate: 2:1 for headers, others based on content needs
+
+## Response Format
+Always respond with:
+1. <image-plan>[JSON array of recommendations]</image-plan>
+2. A conversational message
+
+If approving generation, your message should confirm you're starting generation.`;
+
+  const messages: Anthropic.MessageParam[] = [];
+
+  // Add conversation history
+  if (request.conversationHistory) {
+    for (const msg of request.conversationHistory) {
+      messages.push({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: msg.content,
+      });
+    }
+  }
+
+  messages.push({ role: 'user', content: request.userMessage });
+
+  try {
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      system: systemPrompt,
+      messages,
+    });
+
+    const textContent = response.content.find((block) => block.type === 'text');
+    if (!textContent || textContent.type !== 'text') {
+      throw new ClaudeError('No text in response', 'INVALID_RESPONSE');
+    }
+
+    const fullResponse = textContent.text;
+
+    // Parse the image plan
+    const planMatch = fullResponse.match(/<image-plan>([\s\S]*?)<\/image-plan>/);
+    let recommendations: ImageRecommendation[] = request.currentPlan || [];
+    let message = fullResponse;
+
+    if (planMatch) {
+      try {
+        recommendations = JSON.parse(planMatch[1].trim());
+        message = fullResponse.replace(/<image-plan>[\s\S]*?<\/image-plan>/g, '').trim();
+      } catch (parseError) {
+        console.error('Failed to parse image plan JSON:', parseError);
+      }
+    }
+
+    return {
+      recommendations,
+      message,
+    };
+  } catch (error) {
+    if (error instanceof ClaudeError) {
+      throw error;
+    }
+
+    throw new ClaudeError(
+      `Image planning failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      'IMAGE_PLANNING_FAILED'
     );
   }
 }

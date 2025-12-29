@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Paperclip, Mic, SendHorizontal, Link } from 'lucide-react';
+import { Paperclip, Mic, SendHorizontal, Link, ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -11,11 +11,20 @@ import type { FileAttachment } from '@/types/page';
 interface ChatInputProps {
   onSend: (message: string, attachments?: FileAttachment[]) => void;
   disabled?: boolean;
+  hasContent?: boolean;
+  isGeneratingImages?: boolean;
+  onGenerateImages?: () => void;
 }
 
 const generateFileId = () => `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
+export const ChatInput = ({
+  onSend,
+  disabled,
+  hasContent,
+  isGeneratingImages,
+  onGenerateImages,
+}: ChatInputProps) => {
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -65,7 +74,7 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
   const canSend = (value.trim().length > 0 || attachments.length > 0) && !disabled;
 
   return (
-    <div 
+    <div
       className="relative border-t border-border bg-card p-4"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -73,7 +82,31 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
       onDrop={(e) => handleDrop(e, handleFilesSelected)}
     >
       <FileDropZone isDragOver={isDragOver} />
-      
+
+      {/* Generate Imagery Button */}
+      {hasContent && onGenerateImages && (
+        <div className="mb-3">
+          <Button
+            variant="outline"
+            className="w-full gap-2"
+            onClick={onGenerateImages}
+            disabled={isGeneratingImages}
+          >
+            {isGeneratingImages ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Generating Images...
+              </>
+            ) : (
+              <>
+                <ImageIcon className="w-4 h-4" />
+                Generate Imagery
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
       <input
         ref={fileInputRef}
         type="file"

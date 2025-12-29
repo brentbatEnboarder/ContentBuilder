@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Building2, Loader2, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { useCustomer, Customer } from '@/contexts/CustomerContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 export function CustomerSelection() {
@@ -15,6 +16,31 @@ export function CustomerSelection() {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [customerLogos, setCustomerLogos] = useState<Record<string, string | null>>({});
+
+  // Fetch logos for all customers from customer_settings
+  useEffect(() => {
+    if (customers.length === 0) return;
+
+    const fetchLogos = async () => {
+      const customerIds = customers.map((c) => c.id);
+      const { data } = await supabase
+        .from('customer_settings')
+        .select('customer_id, company_info')
+        .in('customer_id', customerIds);
+
+      if (data) {
+        const logos: Record<string, string | null> = {};
+        data.forEach((row) => {
+          const companyInfo = row.company_info as { logo?: string | null } | null;
+          logos[row.customer_id] = companyInfo?.logo || null;
+        });
+        setCustomerLogos(logos);
+      }
+    };
+
+    fetchLogos();
+  }, [customers]);
 
   const handleSelect = (customer: Customer) => {
     selectCustomer(customer);
@@ -62,12 +88,11 @@ export function CustomerSelection() {
       {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="max-w-4xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Building2 className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <h1 className="text-xl font-bold text-foreground">ContentBuilder</h1>
-          </div>
+          <img
+            src="/ACGLogo.png"
+            alt="AI Content Generator"
+            className="h-8 w-auto"
+          />
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">{user?.email}</span>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
@@ -106,9 +131,19 @@ export function CustomerSelection() {
                   onClick={() => handleSelect(customer)}
                 >
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Building2 className="h-6 w-6 text-primary" />
-                    </div>
+                    {customerLogos[customer.id] ? (
+                      <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        <img
+                          src={customerLogos[customer.id]!}
+                          alt={`${customer.name} logo`}
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Building2 className="h-6 w-6 text-primary" />
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-foreground truncate">{customer.name}</p>
                       <p className="text-sm text-muted-foreground">

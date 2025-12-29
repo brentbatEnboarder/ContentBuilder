@@ -143,6 +143,32 @@ export interface ProcessedUrlResult {
 }
 
 // ============================================================================
+// Image Planning Types
+// ============================================================================
+
+export interface ImageRecommendation {
+  id: string;
+  type: 'header' | 'body';
+  title: string;
+  description: string;
+  aspectRatio: '2:1' | '1:1' | '16:9' | '4:3' | '3:4' | '3:2';
+  placement: 'top' | 'bottom';
+}
+
+export interface ImagePlanResponse {
+  recommendations: ImageRecommendation[];
+  message: string;
+}
+
+export interface ImagePlanRequest {
+  content: string;
+  companyProfile: CompanyProfile;
+  imageStyle: string;
+  conversationHistory?: { role: 'user' | 'assistant'; content: string }[];
+  currentPlan?: ImageRecommendation[];
+}
+
+// ============================================================================
 // Intelligent Scraper Types
 // ============================================================================
 
@@ -298,6 +324,51 @@ export const apiClient = {
   }): Promise<{ success: boolean; data?: GeneratedImage; error?: string }> => {
     const { data } = await api.post('/generate/images/regenerate', params);
     return data;
+  },
+
+  /**
+   * Generate a page title from content
+   */
+  generateTitle: async (content: string): Promise<string> => {
+    try {
+      const { data } = await api.post<{ success: boolean; data?: { title: string }; error?: string }>(
+        '/generate/title',
+        { content }
+      );
+      return data.data?.title || 'Untitled Page';
+    } catch {
+      return 'Untitled Page';
+    }
+  },
+
+  /**
+   * Analyze content and get image recommendations
+   */
+  getImagePlan: async (params: ImagePlanRequest): Promise<ImagePlanResponse> => {
+    const { data } = await api.post<{ success: boolean; data?: ImagePlanResponse; error?: string }>(
+      '/generate/image-plan',
+      params
+    );
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Failed to get image plan');
+    }
+    return data.data;
+  },
+
+  /**
+   * Continue image planning conversation
+   */
+  continueImagePlan: async (
+    params: ImagePlanRequest & { userMessage: string }
+  ): Promise<ImagePlanResponse> => {
+    const { data } = await api.post<{ success: boolean; data?: ImagePlanResponse; error?: string }>(
+      '/generate/image-plan/continue',
+      params
+    );
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Failed to continue image planning');
+    }
+    return data.data;
   },
 
   transcribe: async (audioBlob: Blob) => {

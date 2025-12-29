@@ -56,7 +56,8 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 - **`useStyleSettings.ts`** - Image style selection
 - **`useChat.ts`** - Chat with streaming Claude API
 - **`useImageGeneration.ts`** - Gemini image generation
-- **`usePageEditor.ts`** - Page editing state
+- **`useImagePlanning.ts`** - Conversational image planning with AI recommendations
+- **`usePageEditor.ts`** - Page editing state (auto-generates titles on first save)
 
 ### Backend Services (`/server/src/services`)
 - **`scraper.ts`** - Basic Firecrawl scraping (legacy)
@@ -70,6 +71,9 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 - **POST /api/scrape** - Basic website scraping (legacy)
 - **POST /api/scrape/intelligent** - Multi-page intelligent scraping with SSE progress
 - **POST /api/generate/text** - Claude text generation (supports `stream: true`)
+- **POST /api/generate/title** - Generate page title from content
+- **POST /api/generate/image-plan** - Analyze content and recommend images
+- **POST /api/generate/image-plan/continue** - Continue image planning conversation
 - **POST /api/generate/images** - Gemini image generation
 - **POST /api/transcribe** - Whisper transcription
 - **POST /api/process/file** - File content extraction
@@ -82,7 +86,7 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 3. **Frontend UI** - All screens working (Company, Voice, Visual Style, Pages, PageEditor)
 4. **Hook Migration** - All hooks use Supabase + React Query (not localStorage)
 5. **Chat Integration** - Real Claude API with SSE streaming
-6. **Image Generation** - Real Gemini API, auto-generates after text
+6. **Image Generation** - Real Gemini API with conversational planning
 7. **File Processing** - PDF/DOCX/TXT extraction for chat attachments
 8. **Error Handling** - Loading states, toast notifications on all screens
 9. **Intelligent Scraper** - Multi-page Claude-directed website scanning with real-time progress
@@ -92,6 +96,10 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 13. **Content Tags** - AI wraps publishable content in `<content>` tags, displayed in preview pane
 14. **Chat Styling** - Enboarder avatar (#7C21CC), light purple AI bubbles (#e0c4f4), markdown support
 15. **Conversational Editing** - Current content passed to AI for follow-up modifications
+16. **Customer Selection UI** - Shows customer logos (from company_info) in selection cards
+17. **Auto Page Titles** - AI generates descriptive titles on first save based on content
+18. **Image Planning** - Conversational flow: AI recommends images → user modifies via chat → approves → generates
+19. **Image Cards** - Header images at top, body images at bottom of preview, 3 variations each
 
 ## Environment Variables
 
@@ -204,6 +212,31 @@ Claude wraps publishable content in `<content>` tags:
 - **User Bubble**: Light gray (bg-muted)
 - **Markdown**: Both chat and preview pane support full markdown via react-markdown
 
+### Image Planning Flow
+When user clicks "Generate Imagery" button:
+1. AI analyzes content and recommends images (inline in chat)
+2. Recommendations include: title, description, placement (header/body), aspect ratio
+3. User can modify via conversation ("make the header more abstract", "add a diagram")
+4. When user says "go ahead" / "looks good" / etc., images generate
+5. Header images (2:1 panoramic) appear above content in preview
+6. Body images appear below content, each with 3 variations stacked
+
+```tsx
+// useImagePlanning hook
+const { startPlanning, sendPlanMessage, generateImages } = useImagePlanning();
+
+// Start planning
+const aiMessage = await startPlanning(content);
+
+// Continue conversation
+const result = await sendPlanMessage(content, userMessage);
+if (result.isApproval) {
+  const images = await generateImages(content);
+}
+```
+
+The AI responds with structured `<image-plan>` JSON tags that are parsed to extract recommendations.
+
 ## Key Files
 
 | File | Purpose |
@@ -211,12 +244,16 @@ Claude wraps publishable content in `<content>` tags:
 | `src/App.tsx` | Root with QueryClient, routes |
 | `src/hooks/useChat.ts` | Chat with streaming Claude API, content tag parsing |
 | `src/hooks/useCompanySettings.ts` | Company settings + intelligent URL scanning |
+| `src/hooks/useImagePlanning.ts` | Conversational image planning state machine |
+| `src/hooks/usePageEditor.ts` | Page editing with auto title generation |
 | `src/services/api.ts` | API client with JWT interceptor + streaming |
 | `src/contexts/HeaderActionsContext.tsx` | Header action registration for save/cancel buttons |
 | `src/components/layout/TopHeader.tsx` | Unified header with logo, title, actions |
 | `src/components/layout/LeftNav.tsx` | Left sidebar navigation |
 | `src/components/chat/ChatMessage.tsx` | Chat bubble with markdown support |
 | `src/components/preview/ContentPreview.tsx` | Preview pane with markdown rendering |
+| `src/components/preview/ImageCard.tsx` | Displays 3 image variations for header/body |
 | `src/components/screens/PageEditorScreen.tsx` | Chat + preview split view for content creation |
-| `server/src/services/claude.ts` | Claude API with content tag instructions |
+| `src/pages/CustomerSelection.tsx` | Customer selection with logos |
+| `server/src/services/claude.ts` | Claude API with content tags + image planning |
 | `server/src/services/intelligentScraper.ts` | Multi-page Claude-directed scraper |

@@ -3,9 +3,14 @@ import {
   generateContent,
   generateContentStream,
   generateInterviewQuestion,
+  generateTitle,
+  analyzeContentForImages,
+  continueImagePlanning,
   ClaudeError,
   GenerateContentRequest,
   InterviewContext,
+  ImagePlanRequest,
+  ImageRecommendation,
 } from '../services/claude';
 import {
   generateImages,
@@ -241,6 +246,185 @@ router.post('/interview', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Failed to generate interview response',
+    });
+  }
+});
+
+/**
+ * POST /api/generate/title
+ * Generate a page title from content
+ *
+ * Request body:
+ * {
+ *   content: string
+ * }
+ */
+router.post('/title', async (req: Request, res: Response) => {
+  try {
+    const { content } = req.body;
+
+    if (!content || typeof content !== 'string') {
+      res.status(400).json({
+        success: false,
+        error: 'Missing or invalid content',
+      });
+      return;
+    }
+
+    const title = await generateTitle(content);
+
+    res.json({
+      success: true,
+      data: { title },
+    });
+  } catch (error) {
+    console.error('Generate title error:', error);
+
+    if (error instanceof ClaudeError) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        code: error.code,
+      });
+      return;
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate title',
+    });
+  }
+});
+
+/**
+ * POST /api/generate/image-plan
+ * Analyze content and recommend images
+ *
+ * Request body:
+ * {
+ *   content: string,
+ *   companyProfile: { websiteUrl, companyProfile, brandColors },
+ *   imageStyle: string,
+ *   conversationHistory?: [{ role, content }],
+ *   currentPlan?: ImageRecommendation[]
+ * }
+ */
+router.post('/image-plan', async (req: Request, res: Response) => {
+  try {
+    const { content, companyProfile, imageStyle, conversationHistory, currentPlan } = req.body;
+
+    if (!content || typeof content !== 'string') {
+      res.status(400).json({
+        success: false,
+        error: 'Missing or invalid content',
+      });
+      return;
+    }
+
+    const request: ImagePlanRequest = {
+      content,
+      companyProfile: companyProfile || {
+        websiteUrl: '',
+        companyProfile: '',
+        brandColors: { primary: '#7C21CC', secondary: '', accent: '' },
+      },
+      imageStyle: imageStyle || 'corporate',
+      conversationHistory,
+      currentPlan,
+    };
+
+    const result = await analyzeContentForImages(request);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Image plan error:', error);
+
+    if (error instanceof ClaudeError) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        code: error.code,
+      });
+      return;
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to analyze content for images',
+    });
+  }
+});
+
+/**
+ * POST /api/generate/image-plan/continue
+ * Continue image planning conversation
+ *
+ * Request body:
+ * {
+ *   content: string,
+ *   companyProfile: { ... },
+ *   imageStyle: string,
+ *   conversationHistory: [{ role, content }],
+ *   currentPlan: ImageRecommendation[],
+ *   userMessage: string
+ * }
+ */
+router.post('/image-plan/continue', async (req: Request, res: Response) => {
+  try {
+    const { content, companyProfile, imageStyle, conversationHistory, currentPlan, userMessage } =
+      req.body;
+
+    if (!content || typeof content !== 'string') {
+      res.status(400).json({
+        success: false,
+        error: 'Missing or invalid content',
+      });
+      return;
+    }
+
+    if (!userMessage || typeof userMessage !== 'string') {
+      res.status(400).json({
+        success: false,
+        error: 'Missing or invalid userMessage',
+      });
+      return;
+    }
+
+    const result = await continueImagePlanning({
+      content,
+      companyProfile: companyProfile || {
+        websiteUrl: '',
+        companyProfile: '',
+        brandColors: { primary: '#7C21CC', secondary: '', accent: '' },
+      },
+      imageStyle: imageStyle || 'corporate',
+      conversationHistory: conversationHistory || [],
+      currentPlan: currentPlan || [],
+      userMessage,
+    });
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Image plan continue error:', error);
+
+    if (error instanceof ClaudeError) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        code: error.code,
+      });
+      return;
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to continue image planning',
     });
   }
 });

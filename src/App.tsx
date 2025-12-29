@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { CustomerProvider } from '@/contexts/CustomerContext';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Login } from '@/pages/Login';
 import { CustomerSelection } from '@/pages/CustomerSelection';
@@ -44,7 +45,9 @@ function App() {
                   path="/*"
                   element={
                     <ProtectedRoute>
-                      <AppLayout />
+                      <HeaderActionsProvider>
+                        <AppLayout />
+                      </HeaderActionsProvider>
                     </ProtectedRoute>
                   }
                 />

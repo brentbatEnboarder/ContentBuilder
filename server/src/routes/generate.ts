@@ -45,6 +45,7 @@ router.post('/text', async (req: Request, res: Response) => {
       sourceMaterials,
       feedback,
       stream = false,
+      currentContent,
     } = req.body;
 
     // Validate required fields
@@ -105,6 +106,7 @@ router.post('/text', async (req: Request, res: Response) => {
       imageStyle,
       sourceMaterials,
       feedback,
+      currentContent,
     };
 
     // Handle streaming response

@@ -1,7 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import { ArrowLeft, Check } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,6 +14,7 @@ import { PreviewPane } from '@/components/preview/PreviewPane';
 import { usePageEditor } from '@/hooks/usePageEditor';
 import { useChat } from '@/hooks/useChat';
 import { useImageGeneration } from '@/hooks/useImageGeneration';
+import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import { toast } from 'sonner';
 import type { ScreenType } from '@/hooks/useNavigation';
 import type { FileAttachment } from '@/types/page';
@@ -29,8 +27,6 @@ interface PageEditorScreenProps {
 
 export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScreenProps) => {
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [titleInput, setTitleInput] = useState('');
   const [showSaved, setShowSaved] = useState(false);
 
   const {
@@ -38,7 +34,6 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     isDirty,
     generatedContent,
     isGenerating,
-    updateTitle,
     updateGeneratedContent,
     updateChatHistory,
     setIsGenerating,
@@ -59,6 +54,15 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     },
   });
 
+  // Handle streaming content updates (no image generation)
+  const handleContentStreaming = useCallback(
+    (text: string) => {
+      updateGeneratedContent({ text, images: generatedContent.images });
+    },
+    [updateGeneratedContent, generatedContent.images]
+  );
+
+  // Handle final content (triggers image generation)
   const handleContentGenerated = useCallback(
     async (content: { text: string; images: string[] }) => {
       updateGeneratedContent({ text: content.text, images: [] });
@@ -83,6 +87,8 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
   } = useChat({
     initialMessages: page?.chatHistory || [],
     onContentGenerated: handleContentGenerated,
+    onContentStreaming: handleContentStreaming,
+    currentContent: generatedContent.text || undefined,
   });
 
   // Sync chat messages to page editor state
@@ -91,13 +97,6 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
       updateChatHistory(messages);
     }
   }, [messages, updateChatHistory]);
-
-  // Initialize title input when page loads
-  useEffect(() => {
-    if (page?.title) {
-      setTitleInput(page.title);
-    }
-  }, [page?.title]);
 
   const handleBack = useCallback(() => {
     if (isDirty) {
@@ -124,14 +123,18 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     }
   }, [save]);
 
-  const handleTitleSubmit = useCallback(() => {
-    if (titleInput.trim()) {
-      updateTitle(titleInput.trim());
-    } else {
-      setTitleInput(page?.title || 'Untitled Page');
+  // Register header actions
+  useRegisterHeaderActions(
+    isDirty,
+    false, // isSaving - we handle this locally
+    handleSave,
+    () => {}, // onCancel - not used for page editor
+    {
+      onBack: handleBack,
+      pageTitle: page?.title || 'Untitled Page',
+      showSaved,
     }
-    setIsEditingTitle(false);
-  }, [titleInput, page?.title, updateTitle]);
+  );
 
   const handleSendMessage = useCallback((message: string, attachments?: FileAttachment[]) => {
     setIsGenerating(true);
@@ -197,67 +200,8 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
   }
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            className="gap-2"
-            onClick={handleBack}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Pages
-          </Button>
-
-          <div className="h-6 w-px bg-border" />
-
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-sm">Page:</span>
-            {isEditingTitle ? (
-              <Input
-                value={titleInput}
-                onChange={(e) => setTitleInput(e.target.value)}
-                onBlur={handleTitleSubmit}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleTitleSubmit();
-                  if (e.key === 'Escape') {
-                    setTitleInput(page.title);
-                    setIsEditingTitle(false);
-                  }
-                }}
-                className="h-8 w-64"
-                autoFocus
-              />
-            ) : (
-              <button
-                onClick={() => setIsEditingTitle(true)}
-                className="font-medium text-foreground hover:text-primary transition-colors"
-              >
-                {page.title}
-              </button>
-            )}
-          </div>
-        </div>
-
-        <Button
-          onClick={handleSave}
-          disabled={!isDirty && !showSaved}
-          className="gap-2"
-        >
-          {showSaved ? (
-            <>
-              <Check className="w-4 h-4" />
-              Saved
-            </>
-          ) : (
-            'Save'
-          )}
-        </Button>
-      </div>
-
-      {/* Editor Content */}
-      <div className="flex flex-1 min-h-0">
+    <>
+      <div className="flex h-full">
         {/* Chat Pane - 40% */}
         <div className="w-[40%] min-w-[320px]">
           <ChatPane
@@ -298,6 +242,6 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 };

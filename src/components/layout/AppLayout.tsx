@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { LeftNav } from './LeftNav';
+import { TopHeader } from './TopHeader';
 import { useNavigation } from '@/hooks/useNavigation';
 import { CompanyInfoScreen } from '@/components/screens/CompanyInfoScreen';
 import { BrandVoiceScreen } from '@/components/screens/BrandVoiceScreen';
@@ -62,31 +63,37 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Page editor uses full height without nav layout wrapper
   if (activeScreen === 'page-editor' || activeScreen === 'new-page') {
     return (
-      <div className="flex h-screen w-full bg-background overflow-hidden">
+      <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
+        <TopHeader activeScreen={activeScreen} />
+        <div className="flex flex-1 overflow-hidden">
+          <LeftNav
+            isCollapsed={isNavCollapsed}
+            activeScreen={activeScreen}
+            onToggle={toggleNav}
+            onNavigate={setActiveScreen}
+          />
+          <main className="flex-1 overflow-hidden">
+            {children || renderScreen()}
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
+      <TopHeader activeScreen={activeScreen} />
+      <div className="flex flex-1 overflow-hidden">
         <LeftNav
           isCollapsed={isNavCollapsed}
           activeScreen={activeScreen}
           onToggle={toggleNav}
           onNavigate={setActiveScreen}
         />
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-auto">
           {children || renderScreen()}
         </main>
       </div>
-    );
-  }
-
-  return (
-    <div className="flex h-screen w-full bg-background overflow-hidden">
-      <LeftNav
-        isCollapsed={isNavCollapsed}
-        activeScreen={activeScreen}
-        onToggle={toggleNav}
-        onNavigate={setActiveScreen}
-      />
-      <main className="flex-1 overflow-auto">
-        {children || renderScreen()}
-      </main>
     </div>
   );
 };

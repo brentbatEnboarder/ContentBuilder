@@ -71,6 +71,7 @@ export interface GenerateTextRequest {
   sourceMaterials?: string[];
   feedback?: string;
   stream?: boolean;
+  currentContent?: string;
 }
 
 export interface GenerateTextResponse {

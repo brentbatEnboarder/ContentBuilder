@@ -1,9 +1,9 @@
-import { Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useCallback } from 'react';
 import { StyleGrid } from '@/components/settings/StyleGrid';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { useStyleSettings } from '@/hooks/useStyleSettings';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import { toast } from 'sonner';
 
 export const ImageStyleScreen = () => {
@@ -13,7 +13,7 @@ export const ImageStyleScreen = () => {
   const hasChanges = styleHasChanges || colorHasChanges;
   const isSaving = styleIsSaving || colorIsSaving;
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     try {
       // Save both if either has changes
       if (styleHasChanges) await saveStyle();
@@ -23,22 +23,19 @@ export const ImageStyleScreen = () => {
       toast.error('Failed to save visual settings');
       console.error('Save error:', error);
     }
-  };
+  }, [styleHasChanges, colorHasChanges, saveStyle, saveColors]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     cancelStyle();
     cancelColors();
     toast.info('Changes discarded');
-  };
+  }, [cancelStyle, cancelColors]);
+
+  // Register actions with header
+  useRegisterHeaderActions(hasChanges, isSaving, handleSave, handleCancel);
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      {/* Header */}
-      <h1 className="text-2xl font-bold text-foreground mb-2">Visual Style</h1>
-      <p className="text-muted-foreground mb-8">
-        Configure brand colors and image style for generated content.
-      </p>
-
       {/* Brand Colors Section */}
       <div className="bg-card rounded-lg border border-border p-6 mb-6">
         <h2 className="text-base font-medium text-foreground mb-2">Brand Colors</h2>
@@ -91,23 +88,6 @@ export const ImageStyleScreen = () => {
           selectedStyle={styleSettings.selectedStyle}
           onSelect={selectStyle}
         />
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-3">
-        <Button variant="ghost" onClick={handleCancel} disabled={!hasChanges || isSaving}>
-          Cancel
-        </Button>
-        <Button onClick={handleSave} disabled={!hasChanges || isSaving}>
-          {isSaving ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            'Save Changes'
-          )}
-        </Button>
       </div>
     </div>
   );

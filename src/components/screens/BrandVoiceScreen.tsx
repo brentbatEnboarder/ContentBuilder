@@ -1,12 +1,11 @@
-import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState, useCallback } from 'react';
 import { VoiceSlider } from '@/components/settings/VoiceSlider';
 import { VoiceInfoBox } from '@/components/settings/VoiceInfoBox';
 import { SampleCommunications } from '@/components/settings/SampleCommunications';
 import { VoiceSummary } from '@/components/settings/VoiceSummary';
 import { VoiceJsonExport } from '@/components/settings/VoiceJsonExport';
 import { useVoiceSettings } from '@/hooks/useVoiceSettings';
+import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import { sliderConfigs, DimensionKey } from '@/lib/voiceConfig';
 import { toast } from 'sonner';
 
@@ -19,7 +18,7 @@ export const BrandVoiceScreen = () => {
     setActiveInfo(key);
   };
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     try {
       await save();
       toast.success('Brand voice settings saved successfully');
@@ -27,22 +26,19 @@ export const BrandVoiceScreen = () => {
       toast.error('Failed to save voice settings');
       console.error('Save error:', error);
     }
-  };
+  }, [save]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     cancel();
     setActiveInfo(null);
     toast.info('Changes discarded');
-  };
+  }, [cancel]);
+
+  // Register actions with header
+  useRegisterHeaderActions(hasChanges, isSaving, handleSave, handleCancel);
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      {/* Header */}
-      <h1 className="text-2xl font-bold text-foreground mb-2">Brand Voice</h1>
-      <p className="text-muted-foreground mb-8">
-        Configure how your generated content should sound.
-      </p>
-
       {/* Sliders Section */}
       <div className="bg-card rounded-lg border border-border mb-6">
         {sliderConfigs.map((config, index) => (
@@ -83,23 +79,6 @@ export const BrandVoiceScreen = () => {
 
       {/* JSON Export */}
       <VoiceJsonExport values={settings} />
-
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-3">
-        <Button variant="ghost" onClick={handleCancel} disabled={!hasChanges || isSaving}>
-          Cancel
-        </Button>
-        <Button onClick={handleSave} disabled={!hasChanges || isSaving}>
-          {isSaving ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            'Save Changes'
-          )}
-        </Button>
-      </div>
     </div>
   );
 };

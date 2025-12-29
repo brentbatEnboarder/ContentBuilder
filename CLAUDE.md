@@ -88,6 +88,10 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 9. **Intelligent Scraper** - Multi-page Claude-directed website scanning with real-time progress
 10. **Brand Colors** - 6-color palette (primary, secondary, accent, textColor, buttonBg, buttonFg) auto-extracted
 11. **Image Style Tiles** - Visual Style screen shows sample images for each of 8 styles
+12. **Top Header Bar** - Unified header with logo, page title/subtitle, and action buttons
+13. **Content Tags** - AI wraps publishable content in `<content>` tags, displayed in preview pane
+14. **Chat Styling** - Enboarder avatar (#7C21CC), light purple AI bubbles (#e0c4f4), markdown support
+15. **Conversational Editing** - Current content passed to AI for follow-up modifications
 
 ## Environment Variables
 
@@ -168,15 +172,51 @@ Displayed on **Visual Style** screen alongside image style selection.
 
 Sample images stored in `/public/styles/` (400×300 optimized JPGs with lazy loading).
 
+### Header Actions Context
+Screens register save/cancel actions with the unified TopHeader via `HeaderActionsContext`:
+
+```tsx
+useRegisterHeaderActions(
+  hasChanges,
+  isSaving,
+  handleSave,
+  handleCancel,
+  { onBack, pageTitle, showSaved } // Optional for page editor
+);
+```
+
+The TopHeader automatically shows:
+- Logo (left) or Back button for page editor
+- Page title + subtitle (center)
+- Save/Cancel buttons (right) when `hasChanges` is true
+
+### Content Tags Pattern
+Claude wraps publishable content in `<content>` tags:
+- Conversational responses (questions, clarifications) appear in chat
+- Content inside `<content>...</content>` tags streams to the preview pane
+- `useChat` parses responses and routes content appropriately
+- `currentContent` prop passes existing content back to AI for follow-up edits
+
+### Chat Styling
+- **AI Avatar**: Purple circle (#7C21CC) with white Enboarder icon
+- **AI Bubble**: Light purple background (#e0c4f4)
+- **User Avatar**: Black circle with white Enboarder icon
+- **User Bubble**: Light gray (bg-muted)
+- **Markdown**: Both chat and preview pane support full markdown via react-markdown
+
 ## Key Files
 
 | File | Purpose |
 |------|---------|
 | `src/App.tsx` | Root with QueryClient, routes |
-| `src/hooks/useChat.ts` | Chat with streaming Claude API |
+| `src/hooks/useChat.ts` | Chat with streaming Claude API, content tag parsing |
 | `src/hooks/useCompanySettings.ts` | Company settings + intelligent URL scanning |
 | `src/services/api.ts` | API client with JWT interceptor + streaming |
-| `src/components/screens/CompanyInfoScreen.tsx` | Company info form with scan progress UI |
-| `src/components/screens/ImageStyleScreen.tsx` | Brand colors + image style selection |
+| `src/contexts/HeaderActionsContext.tsx` | Header action registration for save/cancel buttons |
+| `src/components/layout/TopHeader.tsx` | Unified header with logo, title, actions |
+| `src/components/layout/LeftNav.tsx` | Left sidebar navigation |
+| `src/components/chat/ChatMessage.tsx` | Chat bubble with markdown support |
+| `src/components/preview/ContentPreview.tsx` | Preview pane with markdown rendering |
+| `src/components/screens/PageEditorScreen.tsx` | Chat + preview split view for content creation |
+| `server/src/services/claude.ts` | Claude API with content tag instructions |
 | `server/src/services/intelligentScraper.ts` | Multi-page Claude-directed scraper |
-| `server/src/routes/scrape.ts` | Scraping endpoints (basic + intelligent) |

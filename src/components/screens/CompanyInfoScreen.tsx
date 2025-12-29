@@ -1,9 +1,11 @@
+import { useCallback } from 'react';
 import { Building2, Loader2, CheckCircle2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import { toast } from 'sonner';
 
 export const CompanyInfoScreen = () => {
@@ -23,7 +25,7 @@ export const CompanyInfoScreen = () => {
     scanMore,
   } = useCompanySettings();
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     try {
       await save();
       toast.success('Company information saved successfully');
@@ -31,7 +33,15 @@ export const CompanyInfoScreen = () => {
       toast.error('Failed to save company information');
       console.error('Save error:', error);
     }
-  };
+  }, [save]);
+
+  const handleCancel = useCallback(() => {
+    cancel();
+    toast.info('Changes discarded');
+  }, [cancel]);
+
+  // Register actions with header
+  useRegisterHeaderActions(hasChanges, isSaving, handleSave, handleCancel);
 
   const handleScan = async () => {
     await scanUrl();
@@ -40,21 +50,8 @@ export const CompanyInfoScreen = () => {
     }
   };
 
-  const handleCancel = () => {
-    cancel();
-    toast.info('Changes discarded');
-  };
-
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      {/* Header */}
-      <h1 className="text-2xl font-bold text-foreground mb-2">
-        Company Information
-      </h1>
-      <p className="text-muted-foreground mb-8">
-        Set up your company profile to personalize generated content.
-      </p>
-
       {/* URL Input Section */}
       <div className="bg-card rounded-lg border border-border p-6 mb-6">
         <Label className="text-base font-medium">Company URL</Label>
@@ -221,26 +218,6 @@ export const CompanyInfoScreen = () => {
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-3">
-        <Button
-          variant="ghost"
-          onClick={handleCancel}
-          disabled={!hasChanges || isSaving}
-        >
-          Cancel
-        </Button>
-        <Button onClick={handleSave} disabled={!hasChanges || isSaving}>
-          {isSaving ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            'Save Changes'
-          )}
-        </Button>
-      </div>
     </div>
   );
 };

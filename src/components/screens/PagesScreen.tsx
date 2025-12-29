@@ -6,6 +6,7 @@ import { PageCard } from '@/components/pages/PageCard';
 import { EmptyPagesState } from '@/components/pages/EmptyPagesState';
 import { DeletePageDialog } from '@/components/pages/DeletePageDialog';
 import { usePages } from '@/hooks/usePages';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { toast } from 'sonner';
 import type { Page } from '@/types/page';
 
@@ -24,6 +25,8 @@ export const PagesScreen = ({ onEditPage, onCreatePage }: PagesScreenProps) => {
     deletePage,
     duplicatePage,
   } = usePages();
+
+  const { settings: companySettings } = useCompanySettings();
 
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -86,32 +89,27 @@ export const PagesScreen = ({ onEditPage, onCreatePage }: PagesScreenProps) => {
   const noResults = pages.length === 0 && searchQuery.length > 0;
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Pages</h1>
-        {!isEmpty && (
-          <Button onClick={handleCreatePage}>
-            <Plus className="w-4 h-4 mr-2" />
-            Create New Page
-          </Button>
-        )}
-      </div>
-
+    <div className={isEmpty ? "h-full flex items-center justify-center" : "p-8 max-w-4xl mx-auto"}>
       {isEmpty ? (
-        <EmptyPagesState onCreatePage={handleCreatePage} />
+        <EmptyPagesState onCreatePage={handleCreatePage} companyName={companySettings.name} />
       ) : (
         <>
-          {/* Search */}
-          <div className="relative mb-6">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search pages..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+          {/* Search and Create */}
+          <div className="flex gap-3 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search pages..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Button onClick={handleCreatePage}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create New Page
+            </Button>
           </div>
 
           {/* Page List */}

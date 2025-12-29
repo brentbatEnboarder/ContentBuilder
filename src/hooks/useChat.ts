@@ -7,12 +7,42 @@ import { useStyleSettings } from './useStyleSettings';
 
 const generateMessageId = () => `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+/**
+ * Parse AI response to extract content inside <content> tags
+ * Returns { chatMessage: string, previewContent: string | null }
+ */
+const parseContentTags = (text: string): { chatMessage: string; previewContent: string | null } => {
+  const contentMatch = text.match(/<content>([\s\S]*?)<\/content>/);
+
+  if (contentMatch) {
+    const previewContent = contentMatch[1].trim();
+    // Remove the content tags from the chat message
+    const chatMessage = text.replace(/<content>[\s\S]*?<\/content>/g, '').trim();
+    return { chatMessage, previewContent };
+  }
+
+  // Check for unclosed content tag (streaming case)
+  const openTagIndex = text.indexOf('<content>');
+  if (openTagIndex !== -1) {
+    const afterOpenTag = text.substring(openTagIndex + 9);
+    // Content is still streaming, show what we have so far in preview
+    return {
+      chatMessage: text.substring(0, openTagIndex).trim(),
+      previewContent: afterOpenTag.trim() || null,
+    };
+  }
+
+  return { chatMessage: text, previewContent: null };
+};
+
 interface UseChatOptions {
   initialMessages?: ChatMessage[];
   onContentGenerated?: (content: { text: string; images: string[] }) => void;
+  onContentStreaming?: (content: string) => void;
+  currentContent?: string;
 }
 
-export const useChat = ({ initialMessages = [], onContentGenerated }: UseChatOptions = {}) => {
+export const useChat = ({ initialMessages = [], onContentGenerated, onContentStreaming, currentContent }: UseChatOptions = {}) => {
   const { settings: companySettings } = useCompanySettings();
   const { settings: voiceSettings } = useVoiceSettings();
   const { settings: styleSettings } = useStyleSettings();
@@ -116,6 +146,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated }: UseChatOpt
           },
           imageStyle: styleSettings.selectedStyle,
           sourceMaterials,
+          currentContent: currentContent || undefined,
         };
 
         let fullText = '';
@@ -126,22 +157,47 @@ export const useChat = ({ initialMessages = [], onContentGenerated }: UseChatOpt
           // onChunk - update message as chunks arrive
           (chunk: string) => {
             fullText += chunk;
+
+            // Parse content tags while streaming
+            const { chatMessage, previewContent } = parseContentTags(fullText);
+
+            // Update chat with non-content part
             setMessages((prev) =>
               prev.map((msg) =>
-                msg.id === assistantMessageId ? { ...msg, content: fullText } : msg
+                msg.id === assistantMessageId
+                  ? { ...msg, content: chatMessage || 'Generating content...' }
+                  : msg
               )
             );
+
+            // Stream content to preview pane (without triggering image generation)
+            if (previewContent && onContentStreaming) {
+              onContentStreaming(previewContent);
+            }
           },
           // onComplete
           (finalText: string) => {
             setIsLoading(false);
             currentAssistantMessageId.current = null;
 
-            // Notify about generated content
-            if (onContentGenerated) {
+            // Final parse of content tags
+            const { chatMessage, previewContent } = parseContentTags(finalText);
+
+            // Update chat message with final non-content text
+            const finalChatMessage = chatMessage || (previewContent ? 'Here\'s the content I\'ve created for you.' : finalText);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: finalChatMessage }
+                  : msg
+              )
+            );
+
+            // Send final content to preview pane
+            if (previewContent && onContentGenerated) {
               onContentGenerated({
-                text: finalText,
-                images: [], // Images are generated separately
+                text: previewContent,
+                images: [],
               });
             }
           },
@@ -182,7 +238,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated }: UseChatOpt
         );
       }
     },
-    [companySettings, voiceSettings, styleSettings, onContentGenerated]
+    [companySettings, voiceSettings, styleSettings, onContentGenerated, onContentStreaming, currentContent]
   );
 
   /**
@@ -253,6 +309,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated }: UseChatOpt
           },
           imageStyle: styleSettings.selectedStyle,
           sourceMaterials: sourceMaterials.length > 0 ? sourceMaterials : undefined,
+          currentContent: currentContent || undefined,
         };
 
         let fullText = '';
@@ -262,17 +319,47 @@ export const useChat = ({ initialMessages = [], onContentGenerated }: UseChatOpt
           request,
           (chunk: string) => {
             fullText += chunk;
+
+            // Parse content tags while streaming
+            const { chatMessage, previewContent } = parseContentTags(fullText);
+
+            // Update chat with non-content part
             setMessages((prev) =>
               prev.map((msg) =>
-                msg.id === assistantMessageId ? { ...msg, content: fullText } : msg
+                msg.id === assistantMessageId
+                  ? { ...msg, content: chatMessage || 'Generating content...' }
+                  : msg
               )
             );
+
+            // Stream content to preview pane (without triggering image generation)
+            if (previewContent && onContentStreaming) {
+              onContentStreaming(previewContent);
+            }
           },
           (finalText: string) => {
             setIsLoading(false);
             currentAssistantMessageId.current = null;
-            if (onContentGenerated) {
-              onContentGenerated({ text: finalText, images: [] });
+
+            // Final parse of content tags
+            const { chatMessage, previewContent } = parseContentTags(finalText);
+
+            // Update chat message with final non-content text
+            const finalChatMessage = chatMessage || (previewContent ? 'Here\'s the content I\'ve created for you.' : finalText);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: finalChatMessage }
+                  : msg
+              )
+            );
+
+            // Send final content to preview pane (triggers image generation)
+            if (previewContent && onContentGenerated) {
+              onContentGenerated({
+                text: previewContent,
+                images: [],
+              });
             }
           },
           (err: Error) => {
@@ -304,7 +391,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated }: UseChatOpt
         );
       }
     },
-    [companySettings, voiceSettings, styleSettings, onContentGenerated]
+    [companySettings, voiceSettings, styleSettings, onContentGenerated, onContentStreaming, currentContent]
   );
 
   const addSystemMessage = useCallback((content: string) => {

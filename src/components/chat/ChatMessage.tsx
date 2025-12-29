@@ -1,4 +1,6 @@
-import { Bot, User, Paperclip } from 'lucide-react';
+import { Paperclip } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { ChatMessage as ChatMessageType } from '@/types/page';
 import { cn } from '@/lib/utils';
 
@@ -39,16 +41,26 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
       )}>
         <div className={cn(
           'w-6 h-6 rounded-full flex items-center justify-center',
-          isUser ? 'bg-primary' : 'bg-muted'
-        )}>
+          isUser ? 'bg-foreground' : ''
+        )}
+          style={!isUser ? { backgroundColor: '#7C21CC' } : undefined}
+        >
           {isUser ? (
-            <User className="w-3.5 h-3.5 text-primary-foreground" />
+            <img
+              src="/enboarder-icon-white.png"
+              alt="You"
+              className="w-4 h-4"
+            />
           ) : (
-            <Bot className="w-3.5 h-3.5 text-muted-foreground" />
+            <img
+              src="/enboarder-icon-white.png"
+              alt="Enboarder"
+              className="w-4 h-4"
+            />
           )}
         </div>
         <span className="font-medium text-foreground">
-          {isUser ? 'You' : 'AI'}
+          {isUser ? 'You' : 'Enboarder'}
         </span>
         {isUser && (
           <span className="text-muted-foreground">
@@ -57,13 +69,20 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
         )}
       </div>
 
-      <div className={cn(
-        'px-4 py-3 whitespace-pre-wrap',
-        isUser 
-          ? 'bg-primary text-primary-foreground rounded-xl rounded-br-sm' 
-          : 'bg-muted text-foreground rounded-xl rounded-bl-sm'
-      )}>
-        {message.content}
+      <div
+        className={cn(
+          'px-4 py-3 rounded-xl',
+          isUser
+            ? 'bg-muted text-foreground rounded-br-sm'
+            : 'text-foreground rounded-bl-sm'
+        )}
+        style={!isUser ? { backgroundColor: '#e0c4f4' } : undefined}
+      >
+        <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {message.content}
+          </ReactMarkdown>
+        </div>
       </div>
 
       {message.attachments && message.attachments.length > 0 && (

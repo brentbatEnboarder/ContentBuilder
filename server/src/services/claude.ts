@@ -45,6 +45,7 @@ export interface GenerateContentRequest {
   imageStyle?: string;
   sourceMaterials?: SourceMaterial[];
   feedback?: string; // For regeneration with user feedback
+  currentContent?: string; // Previously generated content for context
 }
 
 export interface GenerateContentResult {
@@ -125,6 +126,23 @@ Website: ${companyProfile.websiteUrl || 'Not specified'}
 
 ${voicePrompt}
 
+## CRITICAL: Response Format
+
+When generating publishable content (the actual content the user requested), you MUST wrap it in <content> tags like this:
+
+<content>
+# Your Content Title
+
+Your markdown-formatted content here...
+</content>
+
+IMPORTANT:
+- Only wrap the FINAL PUBLISHABLE CONTENT in <content> tags
+- Do NOT wrap conversational responses, questions, or clarifications in <content> tags
+- If you're asking for clarification or having a conversation, just respond normally without tags
+- When you're ready to provide the actual content they can use, wrap it in <content> tags
+- The content inside the tags should be well-formatted Markdown
+
 ## Content Guidelines
 1. Write in Markdown format with clear headings and structure
 2. Keep content concise but comprehensive
@@ -157,6 +175,17 @@ The accompanying images will use a "${request.imageStyle}" style. Keep this in m
   if (request.feedback) {
     textContent += `\n\n## User Feedback
 Please revise the content based on this feedback: ${request.feedback}`;
+  }
+
+  if (request.currentContent) {
+    textContent += `\n\n## Previously Generated Content
+The following content has already been generated. The user may be asking you to modify, improve, or build upon it:
+
+<existing_content>
+${request.currentContent}
+</existing_content>
+
+If the user is asking for changes (e.g., "make it shorter", "add more detail", "change the tone"), apply those changes to this existing content and output the revised version in <content> tags.`;
   }
 
   // Handle source materials

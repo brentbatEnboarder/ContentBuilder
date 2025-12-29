@@ -3,7 +3,7 @@ import {
   ChevronsRight,
   FilePlus,
   Building2,
-  SlidersHorizontal,
+  Speech,
   Palette,
   FileText,
 } from 'lucide-react';
@@ -24,13 +24,14 @@ interface LeftNavProps {
   onNavigate: (screen: ScreenType) => void;
 }
 
-const navItems: { icon: typeof FilePlus; label: string; screen: ScreenType; isPrimary?: boolean }[] = [
-  { icon: FilePlus, label: 'New Page', screen: 'new-page', isPrimary: true },
+const mainNavItems: { icon: typeof FilePlus; label: string; screen: ScreenType }[] = [
   { icon: Building2, label: 'Company Info', screen: 'company' },
-  { icon: SlidersHorizontal, label: 'Brand Voice', screen: 'voice' },
+  { icon: Speech, label: 'Brand Voice', screen: 'voice' },
   { icon: Palette, label: 'Image Style', screen: 'style' },
   { icon: FileText, label: 'Pages', screen: 'pages' },
 ];
+
+const newPageItem = { icon: FilePlus, label: 'New Page', screen: 'new-page' as ScreenType, isPrimary: true };
 
 export const LeftNav = ({
   isCollapsed,
@@ -59,7 +60,7 @@ export const LeftNav = ({
   return (
     <nav
       className={cn(
-        'h-screen bg-card border-r border-border flex flex-col',
+        'h-full bg-card border-r border-border flex flex-col',
         'transition-all duration-300 ease-in-out',
         isCollapsed ? 'w-16' : 'w-60'
       )}
@@ -76,13 +77,13 @@ export const LeftNav = ({
         )}
       </div>
 
-      {/* Navigation items */}
+      {/* Main navigation items */}
       <div className={cn('flex flex-col gap-1', isCollapsed ? 'px-2' : 'px-3')}>
-        {navItems.map((item) => {
+        {mainNavItems.map((item) => {
           // Pages should be active when on pages or page-editor screen
-          const isActive = item.screen === activeScreen || 
+          const isActive = item.screen === activeScreen ||
             (item.screen === 'pages' && activeScreen === 'page-editor');
-          
+
           return (
             <NavItem
               key={item.screen}
@@ -90,11 +91,22 @@ export const LeftNav = ({
               label={item.label}
               isActive={isActive}
               isCollapsed={isCollapsed}
-              isPrimary={item.isPrimary}
               onClick={() => onNavigate(item.screen)}
             />
           );
         })}
+
+        {/* New Page button with spacing */}
+        <div className="mt-4">
+          <NavItem
+            icon={newPageItem.icon}
+            label={newPageItem.label}
+            isActive={activeScreen === 'new-page'}
+            isCollapsed={isCollapsed}
+            isPrimary={newPageItem.isPrimary}
+            onClick={() => onNavigate(newPageItem.screen)}
+          />
+        </div>
       </div>
 
       {/* Spacer */}

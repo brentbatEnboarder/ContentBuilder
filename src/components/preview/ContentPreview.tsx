@@ -1,3 +1,5 @@
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { ImageGrid } from './ImageGrid';
 
 interface ContentPreviewProps {
@@ -7,51 +9,14 @@ interface ContentPreviewProps {
 }
 
 export const ContentPreview = ({ text, images, onRegenerateImage }: ContentPreviewProps) => {
-  // Parse markdown-like text into formatted content
-  const renderContent = (content: string) => {
-    const lines = content.split('\n');
-    
-    return lines.map((line, index) => {
-      const trimmed = line.trim();
-      
-      // Handle headers
-      if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
-        return (
-          <h2 key={index} className="text-xl font-bold text-foreground mb-3">
-            {trimmed.slice(2, -2)}
-          </h2>
-        );
-      }
-      
-      // Handle bullet points
-      if (trimmed.startsWith('•') || trimmed.startsWith('-')) {
-        return (
-          <li key={index} className="ml-4 text-foreground">
-            {trimmed.slice(1).trim()}
-          </li>
-        );
-      }
-      
-      // Handle empty lines
-      if (trimmed === '') {
-        return <br key={index} />;
-      }
-      
-      // Regular paragraph
-      return (
-        <p key={index} className="text-foreground mb-2">
-          {trimmed}
-        </p>
-      );
-    });
-  };
-
   return (
     <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-      <div className="prose prose-sm max-w-none">
-        {renderContent(text)}
+      <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-primary">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {text}
+        </ReactMarkdown>
       </div>
-      
+
       <ImageGrid images={images} onRegenerateImage={onRegenerateImage} />
     </div>
   );

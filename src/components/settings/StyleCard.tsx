@@ -7,14 +7,14 @@ interface StyleCardProps {
   label: string;
   isSelected: boolean;
   onClick: () => void;
-  gradient: string;
+  image: string;
 }
 
-export const StyleCard = ({ 
-  label, 
-  isSelected, 
-  onClick, 
-  gradient 
+export const StyleCard = ({
+  label,
+  isSelected,
+  onClick,
+  image
 }: StyleCardProps) => {
   return (
     <button
@@ -28,11 +28,16 @@ export const StyleCard = ({
         isSelected ? 'border-primary shadow-sm' : 'border-border'
       )}
     >
-      {/* Image placeholder with gradient */}
-      <div 
-        className="aspect-[4/3] w-full"
-        style={{ background: gradient }}
-      />
+      {/* Sample image */}
+      <div className="aspect-[4/3] w-full bg-muted">
+        <img
+          src={image}
+          alt={`${label} style example`}
+          className="w-full h-full object-cover"
+          loading="lazy"
+          decoding="async"
+        />
+      </div>
       
       {/* Label */}
       <div className="p-3 bg-card text-left">

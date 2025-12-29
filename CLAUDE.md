@@ -87,6 +87,7 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 8. **Error Handling** - Loading states, toast notifications on all screens
 9. **Intelligent Scraper** - Multi-page Claude-directed website scanning with real-time progress
 10. **Brand Colors** - 6-color palette (primary, secondary, accent, textColor, buttonBg, buttonFg) auto-extracted
+11. **Image Style Tiles** - Visual Style screen shows sample images for each of 8 styles
 
 ## Environment Variables
 
@@ -99,7 +100,7 @@ VITE_SUPABASE_URL=https://qobjinzombhqfnzepgvz.supabase.co
 VITE_SUPABASE_ANON_KEY=...
 ANTHROPIC_API_KEY=...
 OPENAI_API_KEY=...
-GOOGLE_API_KEY=...
+NANOBANANA_API_KEY=...   # Google Gemini API key for image generation
 FIRECRAWL_API_KEY=...
 ```
 
@@ -153,6 +154,19 @@ Stored in `company_info.colors` with 6 properties:
 - `buttonFg` - Button foreground/text
 
 Displayed on **Visual Style** screen alongside image style selection.
+
+### Image Styles
+8 image styles available for AI-generated content, defined in `server/src/services/imageGen.ts`:
+- **Corporate** - Professional photography, business attire
+- **Flat** - Bold colors, geometric shapes, vector art
+- **Isometric** - 3D perspective, 45-degree angle illustrations
+- **Abstract** - Dynamic shapes, bold colors, modern art
+- **Hand-drawn** - Sketch style, notebook doodles, pencil strokes
+- **Photorealistic** - High-res photos, natural lighting
+- **Minimalist** - Maximum negative space, subtle palette
+- **Warm** - Soft colors, rounded shapes, cozy aesthetic
+
+Sample images stored in `/public/styles/` (400×300 optimized JPGs with lazy loading).
 
 ## Key Files
 

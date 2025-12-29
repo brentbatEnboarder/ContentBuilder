@@ -39,7 +39,7 @@ export interface GenerateImagesResult {
  */
 export const styleToPrompt: Record<string, string> = {
   corporate:
-    'Professional corporate photography style. Clean, modern office environment with natural lighting. ' +
+    'Professional corporate photography style. ' +
     'Business professionals in contemporary attire. Sharp focus, high quality, polished aesthetic. ' +
     'Suitable for enterprise communications and business presentations.',
 
@@ -55,7 +55,7 @@ export const styleToPrompt: Record<string, string> = {
 
   abstract:
     'Abstract geometric art with dynamic shapes and bold color combinations. ' +
-    'Overlapping circles, triangles, and organic forms. Modern art aesthetic with intentional asymmetry. ' +
+    'Modern art aesthetic with intentional asymmetry. ' +
     'Energetic and creative visual style suitable for innovation and creativity themes.',
 
   handdrawn:

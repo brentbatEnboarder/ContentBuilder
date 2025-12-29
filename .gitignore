@@ -95,3 +95,4 @@ loveable-ai-content-generator/
 
 # Public assets (temporary/generated)
 public/
+!public/styles/

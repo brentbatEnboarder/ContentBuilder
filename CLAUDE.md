@@ -17,6 +17,8 @@ npm run dev:frontend     # Frontend only
 npm run dev:server       # Backend only
 ```
 
+**Note:** The user manages dev servers in their own terminal window. Do not start or manage servers.
+
 ### Build & Test
 ```bash
 npm run build            # Build frontend (tsc + vite)

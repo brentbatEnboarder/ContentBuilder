@@ -62,7 +62,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Page editor uses full height without nav layout wrapper
   if (activeScreen === 'page-editor' || activeScreen === 'new-page') {
     return (
-      <div className="flex min-h-screen w-full bg-background">
+      <div className="flex h-screen w-full bg-background overflow-hidden">
         <LeftNav
           isCollapsed={isNavCollapsed}
           activeScreen={activeScreen}
@@ -77,7 +77,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   }
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div className="flex h-screen w-full bg-background overflow-hidden">
       <LeftNav
         isCollapsed={isNavCollapsed}
         activeScreen={activeScreen}

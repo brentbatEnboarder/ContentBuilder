@@ -1,5 +1,7 @@
 import { LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
 import {
   Tooltip,
   TooltipContent,
@@ -8,24 +10,42 @@ import {
 
 interface UserMenuProps {
   isCollapsed: boolean;
-  userName?: string;
-  userEmail?: string;
 }
 
-export const UserMenu = ({
-  isCollapsed,
-  userName = 'Brent Pearson',
-  userEmail = 'brent@acme.com',
-}: UserMenuProps) => {
-  const initials = userName
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
+export const UserMenu = ({ isCollapsed }: UserMenuProps) => {
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [userName, setUserName] = useState<string>('');
 
-  const handleLogout = () => {
-    console.log('Logout clicked');
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserEmail(user.email || '');
+        // Use email prefix as name if no full name in metadata
+        const fullName = user.user_metadata?.full_name || user.user_metadata?.name;
+        if (fullName) {
+          setUserName(fullName);
+        } else if (user.email) {
+          // Use part before @ as display name
+          setUserName(user.email.split('@')[0]);
+        }
+      }
+    };
+    getUser();
+  }, []);
+
+  const initials = userName
+    ? userName
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : userEmail?.slice(0, 2).toUpperCase() || '?';
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/';
   };
 
   if (isCollapsed) {

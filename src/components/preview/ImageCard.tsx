@@ -18,6 +18,8 @@ export const ImageCard = ({
   // Calculate aspect ratio for CSS
   const getAspectRatioClass = () => {
     switch (aspectRatio) {
+      case '21:9':
+        return 'aspect-[21/9]';
       case '2:1':
         return 'aspect-[2/1]';
       case '16:9':
@@ -26,6 +28,8 @@ export const ImageCard = ({
         return 'aspect-[4/3]';
       case '3:4':
         return 'aspect-[3/4]';
+      case '9:16':
+        return 'aspect-[9/16]';
       case '1:1':
         return 'aspect-square';
       case '3:2':

@@ -157,6 +157,11 @@ export async function generateImages(
     request.customPrompt
   );
 
+  console.log('[ImageGen] Base prompt:');
+  console.log('─'.repeat(60));
+  console.log(prompt);
+  console.log('─'.repeat(60));
+
   const images: GeneratedImage[] = [];
 
   try {
@@ -169,6 +174,8 @@ export async function generateImages(
           ? prompt
           : `${prompt}\n\nThis is variation ${i + 1} of ${count}. Create a distinctly different composition while maintaining the same style and theme.`;
 
+      console.log(`[ImageGen] Generating image ${i + 1}/${count}...`);
+
       const response = await client.models.generateContent({
         model: IMAGE_MODEL,
         contents: variedPrompt,
@@ -176,7 +183,7 @@ export async function generateImages(
           responseModalities: ['TEXT', 'IMAGE'],
           imageConfig: {
             aspectRatio: aspectRatio,
-            imageSize: '2K',
+            imageSize: '1K',
           },
         },
       });

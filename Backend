@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# Backend dev server launcher
+# Usage: ./Backend [-v]
+#   -v  Verbose mode - output to both terminal and log file
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="$SCRIPT_DIR/Logs"
+LOG_FILE="$LOG_DIR/backend.log"
+PORT=3001
+VERBOSE=false
+
+# Parse arguments
+while getopts "v" opt; do
+  case $opt in
+    v) VERBOSE=true ;;
+    *) echo "Usage: $0 [-v]"; exit 1 ;;
+  esac
+done
+
+# Ensure Logs directory exists
+mkdir -p "$LOG_DIR"
+
+# Kill any existing backend server processes on port 3001
+echo "Checking for existing backend processes on port $PORT..."
+PIDS=$(lsof -ti :$PORT 2>/dev/null)
+if [ -n "$PIDS" ]; then
+  echo "Killing existing processes: $PIDS"
+  echo "$PIDS" | xargs kill -9 2>/dev/null
+  sleep 1
+fi
+
+# Clear terminal
+clear
+
+echo "Starting backend dev server..."
+echo "Logs: $LOG_FILE"
+if [ "$VERBOSE" = true ]; then
+  echo "Verbose mode: ON"
+fi
+echo "---"
+
+# Change to project directory
+cd "$SCRIPT_DIR"
+
+# Start the backend server
+if [ "$VERBOSE" = true ]; then
+  # Verbose: output to both terminal and log file
+  npm run dev:server 2>&1 | tee "$LOG_FILE"
+else
+  # Quiet: output to log file only
+  npm run dev:server > "$LOG_FILE" 2>&1
+fi

@@ -45,7 +45,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
   // Image planning hook
   const {
     state: imagePlanState,
-    isPlanning,
+    isPlanningLoading,
     isGenerating: isGeneratingImages,
     startPlanning,
     sendPlanMessage,
@@ -225,7 +225,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
         <div className="w-[40%] min-w-[320px]">
           <ChatPane
             messages={messages}
-            isLoading={isLoading || isPlanning}
+            isLoading={isLoading || isPlanningLoading}
             onSendMessage={handleSendMessage}
             hasContent={!!generatedContent.text}
             isGeneratingImages={isGeneratingImages}

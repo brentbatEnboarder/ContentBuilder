@@ -491,7 +491,7 @@ router.post('/images', async (req: Request, res: Response) => {
     }
 
     // Validate aspectRatio if provided
-    const validAspectRatios = ['1:1', '16:9', '4:3', '3:2'];
+    const validAspectRatios = ['1:1', '16:9', '4:3', '3:2', '9:16', '21:9'];
     if (aspectRatio && !validAspectRatios.includes(aspectRatio)) {
       res.status(400).json({
         success: false,
@@ -602,7 +602,7 @@ router.post('/images/regenerate', async (req: Request, res: Response) => {
     }
 
     // Validate aspectRatio if provided
-    const validAspectRatios = ['1:1', '16:9', '4:3', '3:2'];
+    const validAspectRatios = ['1:1', '16:9', '4:3', '3:2', '9:16', '21:9'];
     if (aspectRatio && !validAspectRatios.includes(aspectRatio)) {
       res.status(400).json({
         success: false,

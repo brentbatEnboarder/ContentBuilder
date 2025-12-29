@@ -112,7 +112,7 @@ VITE_SUPABASE_URL=https://qobjinzombhqfnzepgvz.supabase.co
 VITE_SUPABASE_ANON_KEY=...
 ANTHROPIC_API_KEY=...
 OPENAI_API_KEY=...
-NANOBANANA_API_KEY=...   # Google Gemini API key for image generation
+GOOGLE_API_KEY=...       # Google Gemini API key for image generation (Nano Banana Pro)
 FIRECRAWL_API_KEY=...
 ```
 
@@ -218,8 +218,8 @@ When user clicks "Generate Imagery" button:
 2. Recommendations include: title, description, placement (header/body), aspect ratio
 3. User can modify via conversation ("make the header more abstract", "add a diagram")
 4. When user says "go ahead" / "looks good" / etc., images generate
-5. Header images (2:1 panoramic) appear above content in preview
-6. Body images appear below content, each with 3 variations stacked
+5. Header images (21:9 ultrawide) appear above content in preview
+6. Body images use AI-recommended aspect ratio, appear below content, each with 3 variations stacked
 
 ```tsx
 // useImagePlanning hook
@@ -236,6 +236,15 @@ if (result.isApproval) {
 ```
 
 The AI responds with structured `<image-plan>` JSON tags that are parsed to extract recommendations.
+
+### Image Generation (Nano Banana Pro)
+- **Model:** `gemini-3-pro-image-preview` (Nano Banana Pro)
+- **API Timeout:** 180 seconds (image generation can take 60+ seconds)
+- **Resolution:** 1K (configurable in `server/src/services/imageGen.ts`)
+- **Supported Aspect Ratios:** `1:1`, `16:9`, `4:3`, `3:2`, `9:16`, `21:9`
+- **Header images:** Always use `21:9` ultrawide
+- **Body images:** Use AI-recommended ratio from supported list
+- **Documentation:** See `3rd_Party_Docs/GEMINI_IMAGE_GENERATION_API.md`
 
 ## Key Files
 
@@ -256,4 +265,6 @@ The AI responds with structured `<image-plan>` JSON tags that are parsed to extr
 | `src/components/screens/PageEditorScreen.tsx` | Chat + preview split view for content creation |
 | `src/pages/CustomerSelection.tsx` | Customer selection with logos |
 | `server/src/services/claude.ts` | Claude API with content tags + image planning |
+| `server/src/services/imageGen.ts` | Gemini/Nano Banana Pro image generation |
 | `server/src/services/intelligentScraper.ts` | Multi-page Claude-directed scraper |
+| `3rd_Party_Docs/GEMINI_IMAGE_GENERATION_API.md` | Gemini image API documentation |

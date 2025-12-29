@@ -92,7 +92,7 @@ export interface GenerateImagesRequest {
     secondary?: string;
     accent?: string;
   };
-  aspectRatio?: '1:1' | '16:9' | '4:3' | '3:2';
+  aspectRatio?: '1:1' | '16:9' | '4:3' | '3:2' | '9:16' | '21:9';
   count?: number;
 }
 
@@ -151,7 +151,7 @@ export interface ImageRecommendation {
   type: 'header' | 'body';
   title: string;
   description: string;
-  aspectRatio: '2:1' | '1:1' | '16:9' | '4:3' | '3:4' | '3:2';
+  aspectRatio: '21:9' | '1:1' | '16:9' | '4:3' | '3:4' | '3:2' | '9:16';
   placement: 'top' | 'bottom';
 }
 
@@ -308,9 +308,12 @@ export const apiClient = {
 
   /**
    * Generate images using Gemini
+   * Note: Image generation can take 60+ seconds, so we use a longer timeout
    */
   generateImages: async (params: GenerateImagesRequest): Promise<GenerateImagesResponse> => {
-    const { data } = await api.post('/generate/images', params);
+    const { data } = await api.post('/generate/images', params, {
+      timeout: 180000, // 3 minutes - image generation can be slow
+    });
     return data;
   },
 
@@ -320,9 +323,11 @@ export const apiClient = {
   regenerateImage: async (params: {
     originalPrompt: string;
     modifiedPrompt?: string;
-    aspectRatio?: '1:1' | '16:9' | '4:3' | '3:2';
+    aspectRatio?: '1:1' | '16:9' | '4:3' | '3:2' | '9:16' | '21:9';
   }): Promise<{ success: boolean; data?: GeneratedImage; error?: string }> => {
-    const { data } = await api.post('/generate/images/regenerate', params);
+    const { data } = await api.post('/generate/images/regenerate', params, {
+      timeout: 120000, // 2 minutes for single image regeneration
+    });
     return data;
   },
 

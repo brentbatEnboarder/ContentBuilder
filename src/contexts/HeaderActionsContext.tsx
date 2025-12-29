@@ -23,7 +23,19 @@ export const HeaderActionsProvider = ({ children }: { children: ReactNode }) => 
   const [actions, setActions] = useState<HeaderActions | null>(null);
 
   const registerActions = useCallback((newActions: HeaderActions) => {
-    setActions(newActions);
+    // Only update if values actually changed to prevent infinite loops
+    setActions((prev) => {
+      if (
+        prev?.hasChanges === newActions.hasChanges &&
+        prev?.isSaving === newActions.isSaving &&
+        prev?.pageTitle === newActions.pageTitle &&
+        prev?.showSaved === newActions.showSaved
+      ) {
+        // Values unchanged, keep previous object to avoid re-render
+        return prev;
+      }
+      return newActions;
+    });
   }, []);
 
   const clearActions = useCallback(() => {

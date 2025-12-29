@@ -19,6 +19,7 @@ export const useImagePlanning = () => {
   const { settings: styleSettings } = useStyleSettings();
 
   const [state, setState] = useState<ImagePlanningState>('none');
+  const [isPlanningLoading, setIsPlanningLoading] = useState(false); // Loading during planning conversation
   const [currentPlan, setCurrentPlan] = useState<ImageRecommendation[]>([]);
   const [conversationHistory, setConversationHistory] = useState<
     { role: 'user' | 'assistant'; content: string }[]
@@ -42,6 +43,7 @@ export const useImagePlanning = () => {
    */
   const startPlanning = useCallback(async (content: string): Promise<string | null> => {
     setState('planning');
+    setIsPlanningLoading(true);
     setError(null);
     setConversationHistory([]);
     setCurrentPlan([]);
@@ -65,6 +67,8 @@ export const useImagePlanning = () => {
       setError(err instanceof Error ? err.message : 'Failed to analyze content');
       setState('none');
       return null;
+    } finally {
+      setIsPlanningLoading(false);
     }
   }, [buildCompanyProfile, styleSettings.selectedStyle]);
 
@@ -77,6 +81,7 @@ export const useImagePlanning = () => {
     userMessage: string
   ): Promise<{ message: string; isApproval: boolean } | null> => {
     setError(null);
+    setIsPlanningLoading(true);
 
     // Check for approval phrases
     const approvalPhrases = [
@@ -123,6 +128,8 @@ export const useImagePlanning = () => {
       console.error('Failed to continue image planning:', err);
       setError(err instanceof Error ? err.message : 'Failed to continue planning');
       return null;
+    } finally {
+      setIsPlanningLoading(false);
     }
   }, [buildCompanyProfile, styleSettings.selectedStyle, conversationHistory, currentPlan]);
 
@@ -147,10 +154,19 @@ export const useImagePlanning = () => {
         // Build a detailed prompt from the recommendation
         const prompt = `${rec.description}. Style: ${styleSettings.selectedStyle}. Brand colors: ${companySettings.colors.primary}.`;
 
-        // Map 2:1 to 16:9 since API doesn't support 2:1 directly
-        const apiAspectRatio = rec.aspectRatio === '2:1' ? '16:9' :
-          rec.aspectRatio === '3:4' ? '4:3' : // API might not support 3:4
-          rec.aspectRatio as '1:1' | '16:9' | '4:3' | '3:2';
+        // Header images always use 21:9 ultrawide
+        // Body images use AI-recommended aspect ratio (mapped to valid API values)
+        let apiAspectRatio: '1:1' | '16:9' | '4:3' | '3:2' | '9:16' | '21:9';
+        if (rec.type === 'header') {
+          apiAspectRatio = '21:9';
+        } else {
+          // Map any legacy ratios to valid API values
+          const ratioMap: Record<string, '1:1' | '16:9' | '4:3' | '3:2' | '9:16' | '21:9'> = {
+            '2:1': '16:9',
+            '3:4': '4:3',
+          };
+          apiAspectRatio = ratioMap[rec.aspectRatio] || (rec.aspectRatio as '1:1' | '16:9' | '4:3' | '3:2' | '9:16' | '21:9');
+        }
 
         const result = await apiClient.generateImages({
           contentSummary: prompt,
@@ -181,7 +197,7 @@ export const useImagePlanning = () => {
       setGeneratedImages(generated);
       setState('complete');
       return generated;
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to generate images:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate images');
       setState('planning'); // Go back to planning state on error
@@ -194,6 +210,7 @@ export const useImagePlanning = () => {
    */
   const reset = useCallback(() => {
     setState('none');
+    setIsPlanningLoading(false);
     setCurrentPlan([]);
     setConversationHistory([]);
     setGeneratedImages([]);
@@ -207,6 +224,7 @@ export const useImagePlanning = () => {
     generatedImages,
     error,
     isPlanning: state === 'planning',
+    isPlanningLoading, // True only during active API calls in planning phase
     isGenerating: state === 'generating',
     isComplete: state === 'complete',
     startPlanning,

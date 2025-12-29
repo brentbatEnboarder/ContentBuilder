@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { scrapeWebsite, ScrapeResult, ScraperError } from '../services/scraper';
 import { searchCompanyInfo, CompanyResearchResult } from '../services/braveSearch';
+import { intelligentScrape, scanMorePages, ScrapeProgress, ExtractedCompanyInfo } from '../services/intelligentScraper';
 
 const router = Router();
 
@@ -250,6 +251,71 @@ router.delete('/cache', (_req: Request, res: Response): void => {
   const count = cache.size;
   cache.clear();
   res.json({ success: true, cleared: count });
+});
+
+// ============================================================================
+// POST /api/scrape/intelligent
+// Intelligent multi-page scraping with Claude analysis (SSE streaming)
+// ============================================================================
+
+/**
+ * @route POST /api/scrape/intelligent
+ * @body { url: string, maxPages?: number, scanMore?: boolean }
+ * @returns SSE stream with progress updates, final result included in 'complete' message
+ */
+router.post('/intelligent', async (req: Request, res: Response): Promise<void> => {
+  const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+
+  // Check rate limit
+  const rateLimit = checkRateLimit(clientIp);
+  if (!rateLimit.allowed) {
+    res.status(429).json({
+      error: 'Too many requests',
+      message: 'Rate limit exceeded. Please try again later.',
+      retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+    });
+    return;
+  }
+
+  // Validate input
+  const { url, maxPages = 10, scanMore = false } = req.body;
+
+  const validation = validateUrl(url);
+  if (!validation.valid) {
+    res.status(400).json({
+      error: 'Invalid URL',
+      message: validation.error,
+    });
+    return;
+  }
+
+  // Set up SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  try {
+    const scraper = scanMore
+      ? scanMorePages(validation.normalized!, maxPages)
+      : intelligentScrape(validation.normalized!, maxPages, false);
+
+    // Stream progress updates - the 'complete' message includes the result
+    for await (const progress of scraper) {
+      res.write(`data: ${JSON.stringify(progress)}\n\n`);
+    }
+
+    res.write(`data: [DONE]\n\n`);
+    res.end();
+
+  } catch (error) {
+    console.error('Intelligent scrape error:', error);
+    res.write(`data: ${JSON.stringify({
+      type: 'error',
+      message: error instanceof Error ? error.message : 'Scraping failed'
+    })}\n\n`);
+    res.end();
+  }
 });
 
 export default router;

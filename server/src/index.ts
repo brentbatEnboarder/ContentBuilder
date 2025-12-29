@@ -4,10 +4,14 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 
+// Middleware
+import { authMiddleware } from './middleware/auth';
+
 // Routes
 import scrapeRoutes from './routes/scrape';
 import generateRoutes from './routes/generate';
 import transcribeRoutes from './routes/transcribe';
+import processRoutes from './routes/process';
 
 dotenv.config({ path: '../.env' });
 
@@ -31,14 +35,15 @@ app.get('/api', (_req: Request, res: Response) => {
   res.json({
     name: 'ContentBuilder API',
     version: '1.0.0',
-    endpoints: ['/api/health', '/api/scrape', '/api/generate', '/api/transcribe', '/api/export'],
+    endpoints: ['/api/health', '/api/scrape', '/api/generate', '/api/transcribe', '/api/process', '/api/export'],
   });
 });
 
-// API Routes
-app.use('/api/scrape', scrapeRoutes);
-app.use('/api/generate', generateRoutes);
-app.use('/api/transcribe', transcribeRoutes);
+// API Routes (protected by auth middleware)
+app.use('/api/scrape', authMiddleware, scrapeRoutes);
+app.use('/api/generate', authMiddleware, generateRoutes);
+app.use('/api/transcribe', authMiddleware, transcribeRoutes);
+app.use('/api/process', authMiddleware, processRoutes);
 
 // 404 handler
 app.use((_req: Request, res: Response) => {

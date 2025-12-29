@@ -21,12 +21,29 @@ export interface CompanyProfile {
   brandColors: BrandColors;
 }
 
+/**
+ * Source material can be either text or a document (PDF)
+ */
+export interface SourceMaterial {
+  type: 'text' | 'document';
+  /** Text content (for DOCX, TXT, PPTX extracted text) */
+  text?: string;
+  /** Document data for Claude's document API (for PDFs) */
+  document?: {
+    mediaType: string;
+    base64Data: string;
+    fileName?: string;
+  };
+  /** Optional name/title for the source */
+  name?: string;
+}
+
 export interface GenerateContentRequest {
   objective: string;
   companyProfile: CompanyProfile;
   voiceSettings: VoiceSettings;
   imageStyle?: string;
-  sourceMaterials?: string[];
+  sourceMaterials?: SourceMaterial[];
   feedback?: string; // For regeneration with user feedback
 }
 
@@ -119,6 +136,73 @@ ${voicePrompt}
 }
 
 /**
+ * Build user message content blocks from source materials
+ * Returns an array of content blocks for Claude's API
+ */
+function buildMessageContent(
+  request: GenerateContentRequest
+): Anthropic.ContentBlockParam[] {
+  const contentBlocks: Anthropic.ContentBlockParam[] = [];
+
+  // Start with the main request text
+  let textContent = `## Content Request
+
+**Objective:** ${request.objective}`;
+
+  if (request.imageStyle) {
+    textContent += `\n\n## Image Style Preference
+The accompanying images will use a "${request.imageStyle}" style. Keep this in mind when describing visual elements.`;
+  }
+
+  if (request.feedback) {
+    textContent += `\n\n## User Feedback
+Please revise the content based on this feedback: ${request.feedback}`;
+  }
+
+  // Handle source materials
+  if (request.sourceMaterials && request.sourceMaterials.length > 0) {
+    textContent += '\n\n## Source Materials\nUse the following reference materials to inform the content:\n';
+
+    // Add text for each source material
+    for (let i = 0; i < request.sourceMaterials.length; i++) {
+      const source = request.sourceMaterials[i];
+      const sourceName = source.name || `Source ${i + 1}`;
+
+      if (source.type === 'text' && source.text) {
+        // Text-based source material (DOCX, TXT, PPTX)
+        textContent += `\n### ${sourceName}\n${source.text}\n`;
+      } else if (source.type === 'document' && source.document) {
+        // Document reference - will be added as a separate block
+        textContent += `\n### ${sourceName}\n[See attached document: ${source.document.fileName || 'document.pdf'}]\n`;
+      }
+    }
+  }
+
+  textContent += '\n\nPlease generate the requested content following all guidelines.';
+
+  // Add the main text block first
+  contentBlocks.push({ type: 'text', text: textContent });
+
+  // Add document blocks for PDFs
+  if (request.sourceMaterials) {
+    for (const source of request.sourceMaterials) {
+      if (source.type === 'document' && source.document) {
+        contentBlocks.push({
+          type: 'document',
+          source: {
+            type: 'base64',
+            media_type: source.document.mediaType as 'application/pdf',
+            data: source.document.base64Data,
+          },
+        });
+      }
+    }
+  }
+
+  return contentBlocks;
+}
+
+/**
  * Main content generation function
  */
 export async function generateContent(
@@ -131,37 +215,15 @@ export async function generateContent(
     request.voiceSettings
   );
 
-  // Build user message with objective and optional source materials
-  let userMessage = `## Content Request
-
-**Objective:** ${request.objective}`;
-
-  if (request.sourceMaterials && request.sourceMaterials.length > 0) {
-    userMessage += `\n\n## Source Materials
-Use the following reference materials to inform the content:
-
-${request.sourceMaterials.map((m, i) => `### Source ${i + 1}\n${m}`).join('\n\n')}`;
-  }
-
-  if (request.imageStyle) {
-    userMessage += `\n\n## Image Style Preference
-The accompanying images will use a "${request.imageStyle}" style. Keep this in mind when describing visual elements.`;
-  }
-
-  if (request.feedback) {
-    userMessage += `\n\n## User Feedback
-Please revise the content based on this feedback: ${request.feedback}`;
-  }
-
-  userMessage +=
-    '\n\nPlease generate the requested content following all guidelines.';
+  // Build message content (may include document blocks for PDFs)
+  const messageContent = buildMessageContent(request);
 
   try {
     const response = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4096,
       system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
+      messages: [{ role: 'user', content: messageContent }],
     });
 
     // Extract text from response
@@ -222,36 +284,15 @@ export async function* generateContentStream(
     request.voiceSettings
   );
 
-  let userMessage = `## Content Request
-
-**Objective:** ${request.objective}`;
-
-  if (request.sourceMaterials && request.sourceMaterials.length > 0) {
-    userMessage += `\n\n## Source Materials
-Use the following reference materials to inform the content:
-
-${request.sourceMaterials.map((m, i) => `### Source ${i + 1}\n${m}`).join('\n\n')}`;
-  }
-
-  if (request.imageStyle) {
-    userMessage += `\n\n## Image Style Preference
-The accompanying images will use a "${request.imageStyle}" style.`;
-  }
-
-  if (request.feedback) {
-    userMessage += `\n\n## User Feedback
-Please revise the content based on this feedback: ${request.feedback}`;
-  }
-
-  userMessage +=
-    '\n\nPlease generate the requested content following all guidelines.';
+  // Build message content (may include document blocks for PDFs)
+  const messageContent = buildMessageContent(request);
 
   try {
     const stream = await client.messages.stream({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4096,
       system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
+      messages: [{ role: 'user', content: messageContent }],
     });
 
     for await (const event of stream) {

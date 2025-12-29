@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ContentBuilder is an AI-powered content generation tool for Enboarder's Professional Services team. It generates branded text and images for employee journey workflows (onboarding, offboarding, etc.) by gathering customer context, configuring brand voice, and conducting AI interviews.
 
+**Multi-Customer Architecture:** PS users log in, select a customer (or create one), and all data (pages, brand settings, voice) is scoped to that customer. To switch customers, users must log out and log back in.
+
 ## Commands
 
 ### Development
@@ -24,154 +26,141 @@ npm run lint             # ESLint
 npx tsc --noEmit         # Type check without emitting
 ```
 
-### Server-specific (run from /server)
-```bash
-cd server && npm run dev           # Nodemon with ts-node
-cd server && npm test              # Jest
-cd server && npm run test:watch    # Jest watch mode
-```
-
 ## Architecture
 
 ### Monorepo Structure
 - **`/src`** - React frontend (Vite + TypeScript)
 - **`/server`** - Express backend (TypeScript, separate package.json)
-- **`/contentbuilder-core`** - Lovable-generated UI (separate git repo)
 
-### Frontend (`/src`)
-- **`/contexts/AuthContext.tsx`** - Supabase auth state (login, logout, session)
-- **`/components/ProtectedRoute.tsx`** - Route guard with loading state
-- **`/lib/supabase.ts`** - Supabase client initialization
-- **`/services/api.ts`** - Axios client for backend API calls
-- **`/pages/`** - Route components
+### Supabase Project
+- **Project:** "AI Content Generator"
+- **ID:** `qobjinzombhqfnzepgvz`
+- **Region:** ap-southeast-1
 
-### Backend (`/server/src`)
-- **`index.ts`** - Express server with CORS, helmet, morgan
-- **`/routes/scrape.ts`** - POST /api/scrape (website scraping with rate limiting & caching)
-- **`/routes/generate.ts`** - POST /api/generate/text, /api/generate/interview, /api/generate/images
-- **`/routes/transcribe.ts`** - POST /api/transcribe, /api/transcribe/base64 (voice transcription)
-- **`/services/scraper.ts`** - Firecrawl-based website scraping + node-vibrant color extraction
-- **`/services/braveSearch.ts`** - Company research via Brave Search API
-- **`/services/claude.ts`** - Claude API text generation with streaming support
-- **`/services/imageGen.ts`** - Nano Banana Pro (Gemini) image generation with 8 style presets
-- **`/services/whisper.ts`** - OpenAI Whisper speech-to-text transcription
-- **`/services/voiceData.ts`** - Voice dimension data for prompt building
+### Database Schema
 
-### Frontend Hooks
-- **`/hooks/useAudioRecorder.ts`** - MediaRecorder hook with state machine and audio level
+```sql
+customers (id, name, created_by, created_at, updated_at)
+customer_settings (id, customer_id UNIQUE, company_info JSONB, voice_settings JSONB, style_settings JSONB)
+pages (id, customer_id, title, content JSONB, chat_history JSONB, created_at, updated_at)
+```
 
-### Key Integrations
-- **Supabase** - Auth + database (project: "Prototypes", id: `gosgvisonkpkpsztbeok`)
-- **Firecrawl** - Web scraping via `@mendable/firecrawl-js` (extracts metadata, handles JS rendering)
-- **node-vibrant** - Color extraction from OG images
-- **Brave Search** - Company research and industry inference
-- **Claude API** - Text generation via `@anthropic-ai/sdk` with SSE streaming
-- **Nano Banana Pro** - Image generation via `@google/genai` (Gemini `gemini-3-pro-image-preview`)
-- **Supabase Storage** - `generated-images` bucket for storing generated images
-- **OpenAI Whisper** - Speech-to-text via `openai` SDK using whisper-1 model
+All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
+
+### Frontend Hooks (React Query + Supabase)
+- **`usePages.ts`** - CRUD for pages table
+- **`useCompanySettings.ts`** - Company info with intelligent URL scanning, brand colors
+- **`useVoiceSettings.ts`** - Voice dimension sliders (formality, humor, respect, enthusiasm)
+- **`useStyleSettings.ts`** - Image style selection
+- **`useChat.ts`** - Chat with streaming Claude API
+- **`useImageGeneration.ts`** - Gemini image generation
+- **`usePageEditor.ts`** - Page editing state
+
+### Backend Services (`/server/src/services`)
+- **`scraper.ts`** - Basic Firecrawl scraping (legacy)
+- **`intelligentScraper.ts`** - Multi-page Claude-directed scraping with SSE streaming
+- **`claude.ts`** - Claude API text generation with streaming
+- **`imageGen.ts`** - Gemini image generation
+- **`whisper.ts`** - OpenAI Whisper transcription
+- **`fileProcessor.ts`** - PDF/DOCX/TXT/PPTX processing
+
+### Backend Routes (`/server/src/routes`)
+- **POST /api/scrape** - Basic website scraping (legacy)
+- **POST /api/scrape/intelligent** - Multi-page intelligent scraping with SSE progress
+- **POST /api/generate/text** - Claude text generation (supports `stream: true`)
+- **POST /api/generate/images** - Gemini image generation
+- **POST /api/transcribe** - Whisper transcription
+- **POST /api/process/file** - File content extraction
+
+## Current Implementation Status
+
+### Completed ✅
+1. **Supabase Setup** - Tables, RLS, auth
+2. **Backend Auth** - JWT middleware on all /api/* routes
+3. **Frontend UI** - All screens working (Company, Voice, Visual Style, Pages, PageEditor)
+4. **Hook Migration** - All hooks use Supabase + React Query (not localStorage)
+5. **Chat Integration** - Real Claude API with SSE streaming
+6. **Image Generation** - Real Gemini API, auto-generates after text
+7. **File Processing** - PDF/DOCX/TXT extraction for chat attachments
+8. **Error Handling** - Loading states, toast notifications on all screens
+9. **Intelligent Scraper** - Multi-page Claude-directed website scanning with real-time progress
+10. **Brand Colors** - 6-color palette (primary, secondary, accent, textColor, buttonBg, buttonFg) auto-extracted
+
+## Environment Variables
+
+Required in `.env`:
+```bash
+SUPABASE_URL=https://qobjinzombhqfnzepgvz.supabase.co
+SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+VITE_SUPABASE_URL=https://qobjinzombhqfnzepgvz.supabase.co
+VITE_SUPABASE_ANON_KEY=...
+ANTHROPIC_API_KEY=...
+OPENAI_API_KEY=...
+GOOGLE_API_KEY=...
+FIRECRAWL_API_KEY=...
+```
 
 ## Coding Patterns
 
 ### Styling
-- Use Tailwind CSS semantic tokens: `text-foreground`, `bg-background`, `border-border`
-- Never use raw colors like `text-white` or `bg-black`
-- UI components follow shadcn/ui patterns (Radix primitives)
+- Tailwind semantic tokens: `text-foreground`, `bg-background`, `border-border`
+- Never raw colors like `text-white` or `bg-black`
+- Primary color: Purple (#7C21CC)
 
-### Path Aliases
-- `@/*` maps to `./src/*` (configured in tsconfig.json and vite.config.ts)
-
-### Auth Pattern
+### Hooks Pattern
 ```tsx
-import { useAuth } from '@/contexts/AuthContext';
-const { user, login, logout, loading } = useAuth();
+const { settings, hasChanges, isSaving, save, cancel } = useVoiceSettings();
+// All hooks expose: isLoading, isSaving, error, hasChanges
+// All save functions are async and should be awaited
 ```
 
-### API Client Pattern
+### API Streaming Pattern
 ```tsx
-import { apiClient } from '@/services/api';
-
-// Scrape website for company info
-const result = await apiClient.scrape('https://example.com');
-
-// Generate content with streaming
 await apiClient.generateTextStream(
   request,
-  (chunk) => setText(prev => prev + chunk),  // onChunk
-  () => setComplete(true),                    // onComplete
-  (error) => setError(error.message)          // onError
+  (chunk) => { /* onChunk */ },
+  (fullText) => { /* onComplete */ },
+  (error) => { /* onError */ }
 );
-
-// AI interview follow-up
-const response = await apiClient.interview({ objective, companyProfile, voiceSettings, conversationHistory });
-
-// Generate images with Nano Banana Pro
-const images = await apiClient.generateImages({
-  contentSummary: 'Welcome new employees to our team',
-  styleId: 'flat',  // corporate, flat, isometric, abstract, handdrawn, photorealistic, minimalist, warm
-  customPrompt: 'include diverse people',
-  brandColors: { primary: '#7C21CC', secondary: '', accent: '' },
-  aspectRatio: '16:9',  // 1:1, 16:9, 4:3, 3:2
-  count: 3
-});
-
-// Regenerate single image
-const newImage = await apiClient.regenerateImage({
-  originalPrompt: 'original prompt text',
-  modifiedPrompt: 'add more color',
-  aspectRatio: '16:9'
-});
-
-// Transcribe audio (from useAudioRecorder hook)
-const audioBlob = await stopRecording();
-const result = await apiClient.transcribe(audioBlob);
-console.log(result.data.text);  // Transcribed text
 ```
 
-### Audio Recording Pattern
+### Intelligent Scraper
+The intelligent scraper (`/api/scrape/intelligent`) uses SSE streaming:
+1. Scrapes homepage, extracts internal links
+2. Claude identifies best pages (About, Culture, Careers, Values, etc.)
+3. Scrapes up to 10 relevant pages
+4. Claude extracts company info + 6 brand colors
+5. Real-time progress shown in UI with "Scan More" option
+
 ```tsx
-import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-
-const { state, startRecording, stopRecording, audioLevel, error } = useAudioRecorder();
-
-// state: 'idle' | 'recording' | 'processing'
-// audioLevel: 0-1 for visualization
-// startRecording(): Promise<void> - starts mic capture
-// stopRecording(): Promise<Blob | null> - stops and returns audio blob
+await apiClient.scrapeIntelligent(
+  url,
+  (progress) => { /* onProgress - updates UI */ },
+  { maxPages: 10, scanMore: false }
+);
 ```
 
-## Environment Variables
+### Brand Colors
+Stored in `company_info.colors` with 6 properties:
+- `primary` - Main brand color (logo, headers, CTAs)
+- `secondary` - Supporting color (backgrounds, sections)
+- `accent` - Highlight color (links, hover states)
+- `textColor` - Primary text color
+- `buttonBg` - Button background
+- `buttonFg` - Button foreground/text
 
-Required in `.env` (copy from `.env.example`):
-```
-# Frontend (Vite)
-VITE_SUPABASE_URL=https://gosgvisonkpkpsztbeok.supabase.co
-VITE_SUPABASE_ANON_KEY=...
+Displayed on **Visual Style** screen alongside image style selection.
 
-# Backend
-FIRECRAWL_API_KEY=...          # Required for website scraping
-BRAVE_API_KEY=...              # Optional for company research
-ANTHROPIC_API_KEY=...          # Required for text generation
-GOOGLE_API_KEY=...             # Required for image generation (Nano Banana Pro)
-OPENAI_API_KEY=...             # Required for voice transcription
-```
+## Key Files
 
-## Task Tracking
-
-Active tasks are tracked in `/tasks/tasks-0001-prd-ai-content-generator.md`. Follow the task process:
-1. Work one parent task at a time
-2. Mark subtasks `[x]` as completed
-3. Run tests before committing
-4. Ask for approval before starting next parent task
-
-## Current Status
-
-**Completed:**
-- Task 0.0: Project infrastructure & dependencies
-- Task 1.0: Supabase authentication
-- Task 2.0: Web scraping & company research (Firecrawl + Brave Search)
-- Task 3.0: Claude API text generation (streaming, interview, regeneration)
-- Task 4.0: Nano Banana Pro image generation (8 styles, regeneration, Supabase Storage)
-- Task 5.0: Voice input with Whisper API (MediaRecorder, waveform visualization, transcription)
-
-**Next:**
-- Task 6.0: File processing & URL content extraction
+| File | Purpose |
+|------|---------|
+| `src/App.tsx` | Root with QueryClient, routes |
+| `src/hooks/useChat.ts` | Chat with streaming Claude API |
+| `src/hooks/useCompanySettings.ts` | Company settings + intelligent URL scanning |
+| `src/services/api.ts` | API client with JWT interceptor + streaming |
+| `src/components/screens/CompanyInfoScreen.tsx` | Company info form with scan progress UI |
+| `src/components/screens/ImageStyleScreen.tsx` | Brand colors + image style selection |
+| `server/src/services/intelligentScraper.ts` | Multi-page Claude-directed scraper |
+| `server/src/routes/scrape.ts` | Scraping endpoints (basic + intelligent) |

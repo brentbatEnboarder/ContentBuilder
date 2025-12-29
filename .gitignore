@@ -91,7 +91,7 @@ server/tmp
 .supabase
 
 # Lovable reference (don't track changes)
-contentbuilder-core/
+loveable-ai-content-generator/
 
 # Public assets (temporary/generated)
 public/

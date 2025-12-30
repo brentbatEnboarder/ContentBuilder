@@ -15,6 +15,7 @@ import {
 import {
   generateImages,
   regenerateSingleImage,
+  editImageWithReference,
   ImageGenError,
   GenerateImagesRequest,
 } from '../services/imageGen';
@@ -657,6 +658,113 @@ router.post('/images/regenerate', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Failed to regenerate image',
+    });
+  }
+});
+
+/**
+ * POST /api/generate/images/edit
+ * Edit a single image using a reference image and an edit prompt
+ *
+ * Request body:
+ * {
+ *   referenceImage: string,  // base64 data (without data URL prefix)
+ *   editPrompt: string,
+ *   aspectRatio?: '1:1' | '16:9' | '4:3' | '3:2' | '21:9' | '9:16',
+ *   placementType?: 'header' | 'body' | 'footer'
+ * }
+ */
+router.post('/images/edit', async (req: Request, res: Response) => {
+  try {
+    const { referenceImage, editPrompt, aspectRatio, placementType } = req.body;
+
+    if (!referenceImage || typeof referenceImage !== 'string') {
+      res.status(400).json({
+        success: false,
+        error: 'Missing or invalid referenceImage (base64 data required)',
+      });
+      return;
+    }
+
+    if (!editPrompt || typeof editPrompt !== 'string') {
+      res.status(400).json({
+        success: false,
+        error: 'Missing or invalid editPrompt',
+      });
+      return;
+    }
+
+    // Validate aspectRatio if provided
+    const validAspectRatios = ['1:1', '16:9', '4:3', '3:2', '9:16', '21:9'];
+    if (aspectRatio && !validAspectRatios.includes(aspectRatio)) {
+      res.status(400).json({
+        success: false,
+        error: `Invalid aspectRatio. Must be one of: ${validAspectRatios.join(', ')}`,
+      });
+      return;
+    }
+
+    // Validate placementType if provided
+    const validPlacementTypes = ['header', 'body', 'footer'];
+    if (placementType && !validPlacementTypes.includes(placementType)) {
+      res.status(400).json({
+        success: false,
+        error: `Invalid placementType. Must be one of: ${validPlacementTypes.join(', ')}`,
+      });
+      return;
+    }
+
+    console.log('[ImageGen] Editing image with reference');
+    console.log(`[ImageGen] Edit prompt: ${editPrompt.substring(0, 100)}...`);
+    const startTime = Date.now();
+
+    // Strip data URL prefix if present
+    const base64Data = referenceImage.replace(/^data:image\/\w+;base64,/, '');
+
+    const image = await editImageWithReference(
+      base64Data,
+      editPrompt,
+      aspectRatio as '1:1' | '16:9' | '4:3' | '3:2' | '21:9' | '9:16' | undefined,
+      placementType as 'header' | 'body' | 'footer' | undefined
+    );
+
+    const duration = Date.now() - startTime;
+    console.log(`[ImageGen] Edited image in ${duration}ms`);
+
+    res.json({
+      success: true,
+      data: {
+        id: image.id,
+        base64Data: image.base64Data,
+        mimeType: image.mimeType,
+      },
+    });
+  } catch (error) {
+    console.error('Edit image error:', error);
+
+    if (error instanceof ImageGenError) {
+      const statusCode =
+        error.code === 'RATE_LIMIT'
+          ? 429
+          : error.code === 'AUTH_ERROR'
+            ? 401
+            : error.code === 'CONFIG_ERROR'
+              ? 503
+              : error.code === 'CONTENT_FILTERED'
+                ? 422
+                : 500;
+
+      res.status(statusCode).json({
+        success: false,
+        error: error.message,
+        code: error.code,
+      });
+      return;
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to edit image',
     });
   }
 });

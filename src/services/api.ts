@@ -332,6 +332,21 @@ export const apiClient = {
   },
 
   /**
+   * Edit an image using a reference image and an edit prompt
+   */
+  editImage: async (params: {
+    referenceImage: string; // base64 data URL or raw base64
+    editPrompt: string;
+    aspectRatio?: '1:1' | '16:9' | '4:3' | '3:2' | '9:16' | '21:9';
+    placementType?: 'header' | 'body' | 'footer';
+  }): Promise<{ success: boolean; data?: GeneratedImage; error?: string }> => {
+    const { data } = await api.post('/generate/images/edit', params, {
+      timeout: 180000, // 3 minutes for image editing
+    });
+    return data;
+  },
+
+  /**
    * Generate a page title from content
    */
   generateTitle: async (content: string): Promise<string> => {

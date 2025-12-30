@@ -10,14 +10,26 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { ChatPane } from '@/components/chat/ChatPane';
-import { PreviewPane, GeneratedImageSet } from '@/components/preview/PreviewPane';
+import { PreviewPane } from '@/components/preview/PreviewPane';
 import { usePageEditor } from '@/hooks/usePageEditor';
 import { useChat } from '@/hooks/useChat';
 import { useImagePlanning } from '@/hooks/useImagePlanning';
+import { useImageModal } from '@/hooks/useImageModal';
+import { useContentBlocks } from '@/hooks/useContentBlocks';
+import { useStyleSettings } from '@/hooks/useStyleSettings';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
+import {
+  ImageGenerationModal,
+  ImageSelectionGrid,
+  ImageLightbox,
+  EditImagePanel,
+  RegeneratePopover,
+} from '@/components/modals';
 import { toast } from 'sonner';
 import type { ScreenType } from '@/hooks/useNavigation';
 import type { FileAttachment, ChatMessage } from '@/types/page';
+import type { ContentBlock } from '@/types/content';
 
 interface PageEditorScreenProps {
   pageId: string | null;
@@ -28,7 +40,6 @@ interface PageEditorScreenProps {
 export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScreenProps) => {
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
-  const [plannedImages, setPlannedImages] = useState<GeneratedImageSet[]>([]);
   const isImagePlanningRef = useRef(false);
 
   const {
@@ -42,27 +53,77 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     save,
   } = usePageEditor(pageId);
 
-  // Image planning hook
+  // Settings hooks for image generation
+  const { settings: styleSettings } = useStyleSettings();
+  const { settings: companySettings } = useCompanySettings();
+
+  // Content blocks for draggable preview
+  const {
+    blocks,
+    setAllBlocks,
+    reorderBlocks,
+    deleteBlock,
+  } = useContentBlocks();
+
+  // Image planning hook (conversational flow)
   const {
     state: imagePlanState,
     isPlanningLoading,
-    isGenerating: isGeneratingImages,
+    isGenerating: isGeneratingImagesLegacy,
     startPlanning,
     sendPlanMessage,
-    generateImages: generatePlannedImages,
+    getRecommendationsForModal,
   } = useImagePlanning();
 
-  // Handle streaming content updates (no image generation)
+  // Image modal hook (selection UI)
+  const imageModal = useImageModal({
+    onImagesApplied: (imageBlocks: ContentBlock[]) => {
+      // Separate header and body images
+      const headerBlocks = imageBlocks.filter(
+        (b) => b.type === 'image' && b.placementType === 'header'
+      );
+      const bodyBlocks = imageBlocks.filter(
+        (b) => b.type === 'image' && b.placementType === 'body'
+      );
+
+      // Create text block from current content
+      const textBlock: ContentBlock = {
+        type: 'text',
+        id: 'text-main',
+        content: generatedContent?.text || '',
+      };
+
+      // Header images first, then text, then body images
+      setAllBlocks([...headerBlocks, textBlock, ...bodyBlocks]);
+
+      // IMPORTANT: Also sync images to generatedContent so they get saved
+      // Extract image URLs from the image blocks for persistence
+      const imageUrls = imageBlocks
+        .filter((b): b is ContentBlock & { type: 'image' } => b.type === 'image')
+        .map((b) => b.imageUrl);
+
+      updateGeneratedContent({
+        text: generatedContent?.text || '',
+        images: imageUrls,
+      });
+
+      toast.success('Images applied to content!');
+    },
+  });
+
+  // Handle streaming content updates
   const handleContentStreaming = useCallback(
     (text: string) => {
+      console.log('[PageEditorScreen] handleContentStreaming', { textLength: text.length });
       updateGeneratedContent({ text, images: generatedContent.images });
     },
     [updateGeneratedContent, generatedContent.images]
   );
 
-  // Handle final content (no auto image generation - user clicks button)
+  // Handle final content
   const handleContentGenerated = useCallback(
     async (content: { text: string; images: string[] }) => {
+      console.log('[PageEditorScreen] handleContentGenerated', { textLength: content.text.length });
       updateGeneratedContent({ text: content.text, images: [] });
     },
     [updateGeneratedContent]
@@ -86,7 +147,6 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
       updateChatHistory(messages);
     }
   }, [messages, updateChatHistory]);
-
 
   const handleBack = useCallback(() => {
     if (isDirty) {
@@ -151,15 +211,25 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
         addMessage('assistant', result.message);
 
         if (result.isApproval) {
-          // User approved - generate images
+          // User approved - start the image generation modal
           isImagePlanningRef.current = false;
-          addMessage('assistant', "Great! I'm generating your images now. This may take a moment...");
+          addMessage('assistant', "Great! Opening the image generator. I'll create 3 variations for each placement so you can choose your favorites.");
 
-          const images = await generatePlannedImages(generatedContent.text);
-          if (images.length > 0) {
-            setPlannedImages(images);
-            toast.success('Images generated successfully!');
-          }
+          // Get recommendations and start modal generation
+          const recommendations = getRecommendationsForModal();
+          const brandColors = companySettings.colors
+            ? {
+                primary: companySettings.colors.primary,
+                secondary: companySettings.colors.secondary,
+                accent: companySettings.colors.accent,
+              }
+            : undefined;
+
+          imageModal.startGeneration(
+            recommendations,
+            styleSettings.selectedStyle,
+            brandColors
+          );
         }
       }
       return;
@@ -169,7 +239,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     setIsGenerating(true);
     sendMessage(message, attachments);
     setTimeout(() => setIsGenerating(false), 1500);
-  }, [imagePlanState, sendPlanMessage, generatedContent.text, generatePlannedImages, addMessage, setIsGenerating, sendMessage]);
+  }, [imagePlanState, sendPlanMessage, generatedContent.text, getRecommendationsForModal, companySettings.colors, styleSettings.selectedStyle, imageModal, addMessage, setIsGenerating, sendMessage]);
 
   // Start image planning when "Generate Imagery" is clicked
   const handleGenerateImages = useCallback(async () => {
@@ -195,13 +265,6 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     }
   }, [generatedContent.text, startPlanning, addMessage]);
 
-  const handleRegenerateImage = useCallback(
-    async (index: number) => {
-      toast.info('Image regeneration coming soon');
-    },
-    []
-  );
-
   const handleStyleChange = useCallback(() => {
     if (generatedContent.text) {
       toast('Settings updated', {
@@ -217,6 +280,9 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
       </div>
     );
   }
+
+  // Determine if we're loading images (either modal generating or legacy flow)
+  const isGeneratingImages = imageModal.isLoading || isGeneratingImagesLegacy;
 
   return (
     <>
@@ -241,13 +307,86 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
             onNavigateToVoice={() => onNavigate('voice')}
             onNavigateToStyle={() => onNavigate('style')}
             onRegenerate={handleGenerateImages}
-            onRegenerateImage={handleRegenerateImage}
             onStyleChange={handleStyleChange}
-            plannedImages={plannedImages}
+            contentBlocks={blocks}
+            onReorderBlocks={reorderBlocks}
+            onDeleteBlock={deleteBlock}
             isGeneratingImages={isGeneratingImages}
           />
         </div>
       </div>
+
+      {/* Image Generation Modal */}
+      <ImageGenerationModal
+        isOpen={imageModal.isOpen}
+        onClose={imageModal.closeModal}
+        prompt={imageModal.placements[0]?.description || 'Generating images...'}
+        progress={imageModal.progress}
+        isLoading={imageModal.isLoading}
+        hasGeneratedImages={imageModal.placements.some((p) => p.images.some((i) => i.url))}
+      >
+        <ImageSelectionGrid
+          placements={imageModal.placements}
+          selectedImages={imageModal.selectedImages}
+          skippedPlacements={imageModal.skippedPlacements}
+          onSelectImage={imageModal.selectImage}
+          onSkipPlacement={imageModal.skipPlacement}
+          onRegenerate={(placementId) => {
+            const placement = imageModal.placements.find((p) => p.id === placementId);
+            imageModal.openRegenerate(placementId, null);
+            // Store placement type for the popover
+            if (placement) {
+              // The popover will use this data
+            }
+          }}
+          onImageClick={imageModal.openLightbox}
+          onEditClick={(placementId, imageId) => imageModal.openEdit(imageId, placementId)}
+          onApply={imageModal.applyImages}
+          onCancel={imageModal.closeModal}
+        />
+      </ImageGenerationModal>
+
+      {/* Lightbox */}
+      <ImageLightbox
+        isOpen={imageModal.modalState === 'lightbox'}
+        images={imageModal.lightboxImages}
+        currentImageId={imageModal.currentLightboxId || ''}
+        selectedImages={imageModal.selectedImages}
+        onClose={imageModal.closeLightbox}
+        onNavigate={imageModal.navigateLightbox}
+        onSelect={imageModal.selectImage}
+        onEdit={imageModal.openEdit}
+        onRegenerate={(placementId) => imageModal.openRegenerate(placementId, null)}
+      />
+
+      {/* Edit Panel */}
+      <EditImagePanel
+        isOpen={imageModal.modalState === 'editing'}
+        referenceImage={imageModal.editingImage}
+        onSubmit={imageModal.submitEdit}
+        onClose={imageModal.closeEdit}
+        isLoading={imageModal.isEditLoading}
+        error={imageModal.editError}
+      />
+
+      {/* Regenerate Popover */}
+      {imageModal.regenerateData && (
+        <RegeneratePopover
+          isOpen={true}
+          anchorRect={imageModal.regenerateData.anchorRect}
+          placementId={imageModal.regenerateData.placementId}
+          placementType={
+            imageModal.placements.find((p) => p.id === imageModal.regenerateData?.placementId)
+              ?.type || 'body'
+          }
+          currentPrompt={
+            imageModal.placements.find((p) => p.id === imageModal.regenerateData?.placementId)
+              ?.description || ''
+          }
+          onRegenerate={imageModal.regeneratePlacement}
+          onClose={imageModal.closeRegenerate}
+        />
+      )}
 
       {/* Discard Changes Dialog */}
       <AlertDialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>

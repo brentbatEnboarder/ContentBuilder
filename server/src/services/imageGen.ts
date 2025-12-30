@@ -319,6 +319,101 @@ export async function regenerateSingleImage(
 }
 
 /**
+ * Edit an image using a reference image and an edit prompt
+ * Uses Gemini's vision capabilities to understand the reference and generate a modified version
+ */
+export async function editImageWithReference(
+  referenceImageBase64: string,
+  editPrompt: string,
+  aspectRatio: '1:1' | '16:9' | '4:3' | '3:2' | '21:9' | '9:16' = '16:9',
+  placementType: 'header' | 'body' | 'footer' = 'body'
+): Promise<GeneratedImage> {
+  const client = getGenAIClient();
+
+  // Build the edit prompt with context
+  const fullPrompt = `Based on the reference image provided, create a new image with the following modifications:
+
+${editPrompt}
+
+Important guidelines:
+- Maintain the overall theme and context of the original image
+- Apply the requested modifications while keeping the image professional
+- The image should be suitable for workplace communications
+- This is a ${placementType} image, so adjust the composition appropriately`;
+
+  console.log('[ImageGen] Edit prompt:');
+  console.log('─'.repeat(60));
+  console.log(fullPrompt);
+  console.log('─'.repeat(60));
+
+  try {
+    // Gemini's native image editing: pass reference image with edit instructions
+    const response = await client.models.generateContent({
+      model: IMAGE_MODEL,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: fullPrompt,
+            },
+            {
+              inlineData: {
+                mimeType: 'image/png',
+                data: referenceImageBase64,
+              },
+            },
+          ],
+        },
+      ],
+      config: {
+        responseModalities: ['TEXT', 'IMAGE'],
+        imageConfig: {
+          aspectRatio: aspectRatio,
+          imageSize: '1K',
+        },
+      },
+    });
+
+    const candidate = response.candidates?.[0];
+    if (!candidate?.content?.parts) {
+      throw new ImageGenError('No content in edit response', 'INVALID_RESPONSE');
+    }
+
+    for (const part of candidate.content.parts) {
+      if (part.inlineData) {
+        return {
+          id: generateImageId(),
+          base64Data: part.inlineData.data as string,
+          mimeType: part.inlineData.mimeType || 'image/png',
+          prompt: editPrompt,
+        };
+      }
+    }
+
+    throw new ImageGenError('No image in edit response', 'INVALID_RESPONSE');
+  } catch (error) {
+    if (error instanceof ImageGenError) {
+      throw error;
+    }
+
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    if (errorMessage.includes('safety') || errorMessage.includes('blocked')) {
+      throw new ImageGenError(
+        'Image editing was blocked due to content safety filters. Please try a different prompt.',
+        'CONTENT_FILTERED'
+      );
+    }
+
+    throw new ImageGenError(
+      `Failed to edit image: ${errorMessage}`,
+      'EDIT_FAILED'
+    );
+  }
+}
+
+/**
  * Custom error class for image generation errors
  */
 export class ImageGenError extends Error {

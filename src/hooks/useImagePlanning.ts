@@ -137,7 +137,7 @@ export const useImagePlanning = () => {
    * Generate all images based on the current plan
    * Returns the generated image sets
    */
-  const generateImages = useCallback(async (content: string): Promise<GeneratedImageSet[]> => {
+  const generateImages = useCallback(async (_content: string): Promise<GeneratedImageSet[]> => {
     if (currentPlan.length === 0) {
       setError('No images to generate');
       return [];
@@ -217,6 +217,32 @@ export const useImagePlanning = () => {
     setError(null);
   }, []);
 
+  /**
+   * Get the prompt/description for a specific recommendation
+   * Useful for the regenerate popover to show current prompt
+   */
+  const getPromptForRecommendation = useCallback(
+    (recId: string): string => {
+      const rec = currentPlan.find((r) => r.id === recId);
+      return rec?.description || '';
+    },
+    [currentPlan]
+  );
+
+  /**
+   * Get recommendations formatted for useImageModal
+   * Maps the currentPlan to the format expected by startGeneration
+   */
+  const getRecommendationsForModal = useCallback(() => {
+    return currentPlan.map((rec) => ({
+      id: rec.id,
+      type: rec.type,
+      title: rec.title,
+      description: rec.description,
+      aspectRatio: rec.aspectRatio,
+    }));
+  }, [currentPlan]);
+
   return {
     state,
     currentPlan,
@@ -231,5 +257,7 @@ export const useImagePlanning = () => {
     sendPlanMessage,
     generateImages,
     reset,
+    getPromptForRecommendation,
+    getRecommendationsForModal,
   };
 };

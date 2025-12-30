@@ -44,6 +44,8 @@ export const usePages = () => {
   } = useQuery({
     queryKey: ['pages', customerId],
     queryFn: async () => {
+      console.log('[usePages] Fetching pages for customer', customerId);
+
       if (!customerId) return [];
 
       const { data, error } = await supabase
@@ -52,7 +54,20 @@ export const usePages = () => {
         .eq('customer_id', customerId)
         .order('updated_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[usePages] Fetch error', error);
+        throw error;
+      }
+
+      console.log('[usePages] Fetched pages', {
+        count: data?.length,
+        pages: data?.map((p: PageRow) => ({
+          id: p.id,
+          title: p.title,
+          contentLength: p.content?.text?.length || 0,
+        })),
+      });
+
       return (data as PageRow[]).map(rowToPage);
     },
     enabled: !!customerId,
@@ -61,7 +76,12 @@ export const usePages = () => {
   // Mutation: Create a new page
   const createMutation = useMutation({
     mutationFn: async (title: string = 'Untitled Page') => {
-      if (!customerId) throw new Error('No customer selected');
+      console.log('[usePages] createPage called', { title, customerId });
+
+      if (!customerId) {
+        console.error('[usePages] No customer selected for create');
+        throw new Error('No customer selected');
+      }
 
       const { data, error } = await supabase
         .from('pages')
@@ -74,7 +94,12 @@ export const usePages = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[usePages] Supabase create error', error);
+        throw error;
+      }
+
+      console.log('[usePages] Supabase create success', data);
       return rowToPage(data as PageRow);
     },
     onSuccess: () => {
@@ -85,7 +110,12 @@ export const usePages = () => {
   // Mutation: Update an existing page
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Page> }) => {
-      if (!customerId) throw new Error('No customer selected');
+      console.log('[usePages] updatePage called', { id, customerId, updates });
+
+      if (!customerId) {
+        console.error('[usePages] No customer selected');
+        throw new Error('No customer selected');
+      }
 
       const updateData: Record<string, unknown> = {};
       if (updates.title !== undefined) updateData.title = updates.title;
@@ -97,6 +127,8 @@ export const usePages = () => {
         }));
       }
 
+      console.log('[usePages] Supabase update payload', { id, updateData });
+
       const { data, error } = await supabase
         .from('pages')
         .update(updateData)
@@ -105,7 +137,12 @@ export const usePages = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[usePages] Supabase update error', error);
+        throw error;
+      }
+
+      console.log('[usePages] Supabase update success', data);
       return rowToPage(data as PageRow);
     },
     onSuccess: () => {

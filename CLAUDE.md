@@ -57,6 +57,8 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 - **`useChat.ts`** - Chat with streaming Claude API
 - **`useImageGeneration.ts`** - Gemini image generation
 - **`useImagePlanning.ts`** - Conversational image planning with AI recommendations
+- **`useImageModal.ts`** - State machine for image generation modal (selection, lightbox, edit, regenerate)
+- **`useContentBlocks.ts`** - Content block state with drag-drop reordering
 - **`usePageEditor.ts`** - Page editing state (auto-generates titles on first save)
 
 ### Backend Services (`/server/src/services`)
@@ -237,6 +239,60 @@ if (result.isApproval) {
 
 The AI responds with structured `<image-plan>` JSON tags that are parsed to extract recommendations.
 
+### Image Generation Modal (Phases 7-9 Complete)
+
+A full-screen modal experience for image generation with selection, editing, and drag-to-reorder functionality.
+
+**Implementation Status:** Core integration complete. See `tasks/page-save-improvements.md` for known issues.
+
+#### Completed Components (in `src/`)
+| Component | File | Purpose |
+|-----------|------|---------|
+| Modal + Animation | `components/modals/ImageGenerationModal.tsx` | Robot painter loading, progress bar |
+| Selection Grid | `components/modals/ImageSelectionGrid.tsx` | Placement groups, hover select/edit |
+| Lightbox | `components/modals/ImageLightbox.tsx` | Full-screen view, keyboard nav |
+| Edit Panel | `components/modals/EditImagePanel.tsx` | Reference image + prompt editing |
+| Regenerate Popover | `components/modals/RegeneratePopover.tsx` | Modify prompt before regenerating |
+| Draggable Image | `components/content/DraggableImageCard.tsx` | Sortable card with @dnd-kit |
+| Draggable Preview | `components/content/DraggableContentPreview.tsx` | Content blocks + drag context |
+| Text Block | `components/content/TextBlock.tsx` | Markdown renderer |
+| Drop Zone | `components/content/DropZone.tsx` | Visual drop indicator |
+| useImageModal Hook | `hooks/useImageModal.ts` | State machine for modal flow |
+| Content Blocks Hook | `hooks/useContentBlocks.ts` | Block state management |
+| Types | `types/content.ts`, `types/imageGeneration.ts` | All type definitions |
+
+#### Integration Flow
+1. User clicks "Generate Imagery" → AI recommends images in chat
+2. User approves → `useImageModal.startGeneration()` opens modal
+3. Modal shows loading animation → generates 3 variations per placement
+4. User selects/skips/edits images → clicks "Apply"
+5. `onImagesApplied` creates `ContentBlock[]` → renders in draggable preview
+
+#### Remaining Work (Phase 10 - Polish)
+- Test edge cases and error handling
+- Accessibility improvements
+- Performance optimization for large images
+
+#### Backend Additions
+- `POST /api/generate/images/edit` - Edit image with reference + prompt
+- `editImageWithReference()` in `server/src/services/imageGen.ts`
+- `editImage()` in `src/services/api.ts`
+
+#### Content Block Types
+```typescript
+type ContentBlock =
+  | { type: 'text'; id: string; content: string; }
+  | { type: 'image'; id: string; imageUrl: string; aspectRatio: AspectRatio; placementType: PlacementType; altText?: string; };
+
+type AspectRatio = '21:9' | '16:9' | '4:3' | '1:1' | '3:2' | '9:16';
+type PlacementType = 'header' | 'body' | 'footer';
+```
+
+#### Dependencies Added
+```bash
+npm install framer-motion @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
+```
+
 ### Image Generation (Nano Banana Pro)
 - **Model:** `gemini-3-pro-image-preview` (Nano Banana Pro)
 - **API Timeout:** 180 seconds (image generation can take 60+ seconds)
@@ -254,17 +310,25 @@ The AI responds with structured `<image-plan>` JSON tags that are parsed to extr
 | `src/hooks/useChat.ts` | Chat with streaming Claude API, content tag parsing |
 | `src/hooks/useCompanySettings.ts` | Company settings + intelligent URL scanning |
 | `src/hooks/useImagePlanning.ts` | Conversational image planning state machine |
+| `src/hooks/useImageModal.ts` | Image generation modal state machine |
+| `src/hooks/useContentBlocks.ts` | Content block state with drag-drop reordering |
 | `src/hooks/usePageEditor.ts` | Page editing with auto title generation |
+| `tasks/page-save-improvements.md` | Known issues and future work for page saving |
 | `src/services/api.ts` | API client with JWT interceptor + streaming |
+| `src/types/content.ts` | ContentBlock, AspectRatio, PlacementType types |
+| `src/types/imageGeneration.ts` | ImagePlacement, GenerationProgress, LightboxImage types |
 | `src/contexts/HeaderActionsContext.tsx` | Header action registration for save/cancel buttons |
 | `src/components/layout/TopHeader.tsx` | Unified header with logo, title, actions |
 | `src/components/layout/LeftNav.tsx` | Left sidebar navigation |
 | `src/components/chat/ChatMessage.tsx` | Chat bubble with markdown support |
 | `src/components/preview/ContentPreview.tsx` | Preview pane with markdown rendering |
 | `src/components/preview/ImageCard.tsx` | Displays 3 image variations for header/body |
+| `src/components/modals/` | Image generation modal components (5 files) |
+| `src/components/content/` | Draggable content components (4 files) |
 | `src/components/screens/PageEditorScreen.tsx` | Chat + preview split view for content creation |
 | `src/pages/CustomerSelection.tsx` | Customer selection with logos |
 | `server/src/services/claude.ts` | Claude API with content tags + image planning |
-| `server/src/services/imageGen.ts` | Gemini/Nano Banana Pro image generation |
+| `server/src/services/imageGen.ts` | Gemini image generation + editImageWithReference |
 | `server/src/services/intelligentScraper.ts` | Multi-page Claude-directed scraper |
-| `3rd_Party_Docs/GEMINI_IMAGE_GENERATION_API.md` | Gemini image API documentation |
+| `IMAGE_MODAL_IMPLEMENTATION.md` | Detailed implementation guide for remaining work |
+| `loveable-ai-content-generator/` | Lovable prototype repo (reference) |

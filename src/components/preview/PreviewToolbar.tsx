@@ -8,7 +8,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { VoiceDropdown } from './VoiceDropdown';
-import { StyleDropdown } from './StyleDropdown';
 import { toast } from 'sonner';
 
 interface PreviewToolbarProps {
@@ -16,9 +15,7 @@ interface PreviewToolbarProps {
   hasContent: boolean;
   isGenerating: boolean;
   onNavigateToVoice: () => void;
-  onNavigateToStyle: () => void;
   onRegenerate: () => void;
-  onStyleChange?: () => void;
 }
 
 export const PreviewToolbar = ({
@@ -26,9 +23,7 @@ export const PreviewToolbar = ({
   hasContent,
   isGenerating,
   onNavigateToVoice,
-  onNavigateToStyle,
   onRegenerate,
-  onStyleChange,
 }: PreviewToolbarProps) => {
   const handleCopy = () => {
     navigator.clipboard.writeText(content);
@@ -43,10 +38,6 @@ export const PreviewToolbar = ({
     <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
       <div className="flex items-center gap-2">
         <VoiceDropdown onNavigateToSettings={onNavigateToVoice} />
-        <StyleDropdown 
-          onNavigateToSettings={onNavigateToStyle} 
-          onStyleChange={onStyleChange}
-        />
       </div>
 
       <div className="flex items-center gap-1">

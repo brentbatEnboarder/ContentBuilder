@@ -23,10 +23,8 @@ interface PreviewPaneProps {
   };
   isGenerating: boolean;
   onNavigateToVoice: () => void;
-  onNavigateToStyle: () => void;
   onRegenerate: () => void;
   onRegenerateImage?: (index: number) => void;
-  onStyleChange?: () => void;
   // New props for planned images (legacy flow)
   plannedImages?: GeneratedImageSet[];
   isGeneratingImages?: boolean;
@@ -40,10 +38,8 @@ export const PreviewPane = ({
   content,
   isGenerating,
   onNavigateToVoice,
-  onNavigateToStyle,
   onRegenerate,
   onRegenerateImage,
-  onStyleChange,
   plannedImages = [],
   isGeneratingImages = false,
   contentBlocks = [],
@@ -64,9 +60,7 @@ export const PreviewPane = ({
         hasContent={hasContent}
         isGenerating={isGenerating}
         onNavigateToVoice={onNavigateToVoice}
-        onNavigateToStyle={onNavigateToStyle}
         onRegenerate={onRegenerate}
-        onStyleChange={onStyleChange}
       />
 
       <ScrollArea className="flex-1">

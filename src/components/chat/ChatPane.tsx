@@ -9,6 +9,10 @@ interface ChatPaneProps {
   hasContent?: boolean;
   isGeneratingImages?: boolean;
   onGenerateImages?: () => void;
+  onSelectImage?: (imageUrl: string) => void;
+  onEditImage?: (imageUrl: string) => void;
+  onNavigateToStyle?: () => void;
+  onStyleChange?: () => void;
 }
 
 export const ChatPane = ({
@@ -18,16 +22,27 @@ export const ChatPane = ({
   hasContent,
   isGeneratingImages,
   onGenerateImages,
+  onSelectImage,
+  onEditImage,
+  onNavigateToStyle,
+  onStyleChange,
 }: ChatPaneProps) => {
   return (
     <div className="flex flex-col h-full bg-card border-r border-border">
-      <ChatMessages messages={messages} isLoading={isLoading} />
+      <ChatMessages
+        messages={messages}
+        isLoading={isLoading}
+        onSelectImage={onSelectImage}
+        onEditImage={onEditImage}
+      />
       <ChatInput
         onSend={onSendMessage}
         disabled={isLoading}
         hasContent={hasContent}
         isGeneratingImages={isGeneratingImages}
         onGenerateImages={onGenerateImages}
+        onNavigateToStyle={onNavigateToStyle}
+        onStyleChange={onStyleChange}
       />
     </div>
   );

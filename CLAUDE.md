@@ -105,11 +105,13 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 19. **Image Cards** - Header images at top, body images at bottom of preview, 3 variations each
 20. **Progressive Image Loading** - Images display immediately as they complete, with background progress bar for remaining
 21. **Inline Image Generation Tool** - Claude can generate images via tool call when user asks naturally (e.g., "generate an image of a dog")
-22. **Conversation History** - Chat maintains full conversation context so Claude remembers previous exchanges
-23. **Chat Logging** - Full conversation transcripts logged to backend for debugging
-24. **Parallel Image Generation** - All image variations and placements generate simultaneously (~3x faster)
-25. **SSE Image Streaming** - Images appear one-by-one as they complete via Server-Sent Events
-26. **Claude API Logging** - Full system prompts and messages logged to backend console for debugging
+22. **Inline Image Actions** - Hover over chat images to Select (add to content) or Edit (modify with reference image)
+23. **Conversation History** - Chat maintains full conversation context so Claude remembers previous exchanges
+24. **Chat Logging** - Full conversation transcripts logged to backend for debugging
+25. **Parallel Image Generation** - All image variations and placements generate simultaneously (~3x faster)
+26. **SSE Image Streaming** - Images appear one-by-one as they complete via Server-Sent Events
+27. **Claude API Logging** - Full system prompts and messages logged to backend console for debugging
+28. **Compact Chat Input** - Style dropdown + Generate Imagery above input; +/mic/send buttons embedded in input box
 
 ## Environment Variables
 
@@ -169,6 +171,18 @@ Defined in `server/src/services/claude.ts` as `imageGenerationTool`. The tool:
 - Uses the customer's configured image style by default
 - Generates a single image (vs. 3 variations for planned images)
 - Displays inline in the chat message with click-to-expand lightbox
+
+### Inline Image Actions
+When hovering over generated images in chat, action buttons appear:
+- **Select**: Adds image to content blocks (appears in preview pane)
+- **Edit**: Opens modal to modify image with reference + prompt
+- **Expand**: Full-screen lightbox view
+
+The Edit modal (`InlineImageEditModal.tsx`) uses Gemini's vision capabilities:
+1. Shows reference image thumbnail on left
+2. Chat-style input for edit instructions on right
+3. Suggestion chips for common modifications
+4. Edited image appears in chat, can then be selected
 
 ### Chat Logging
 Full conversation transcripts are logged to the backend console for debugging:
@@ -249,6 +263,8 @@ The TopHeader automatically shows:
 - Page title + subtitle (center)
 - Save/Cancel buttons (right) when `hasChanges` is true
 
+**Important:** Callbacks are stored in refs (not state) to prevent stale closure bugs. Display state (hasChanges, isSaving) triggers re-renders; callbacks are always accessed fresh from refs.
+
 ### Content Tags Pattern
 Claude wraps publishable content in `<content>` tags:
 - Conversational responses (questions, clarifications) appear in chat
@@ -262,6 +278,25 @@ Claude wraps publishable content in `<content>` tags:
 - **User Avatar**: Black circle with white Enboarder icon
 - **User Bubble**: Light gray (bg-muted)
 - **Markdown**: Both chat and preview pane support full markdown via react-markdown
+
+### Chat Input Layout
+Compact layout with all controls in one area:
+```
+┌─────────────────────────────────────┐
+│  [Style: Flat ▼]  [Generate Imagery] │  ← Above input
+├─────────────────────────────────────┤
+│ ┌─────────────────────────────────┐ │
+│ │ Type, paste URL, or drop files │ │
+│ │                                 │ │
+│ │ [+]                     [🎤][➤]│ │  ← Embedded buttons
+│ └─────────────────────────────────┘ │
+└─────────────────────────────────────┘
+```
+- **Style dropdown**: Quick style selection for image generation
+- **Generate Imagery**: Triggers image planning flow (greyed out until content exists)
+- **Plus (+)**: Attach files (PDF, DOCX, TXT, PPTX)
+- **Mic**: Voice input (coming soon)
+- **Send**: Submit message
 
 ### Image Planning Flow
 When user clicks "Generate Imagery" button:
@@ -410,7 +445,9 @@ You are an expert content writer for Enboarder...
 | `src/contexts/HeaderActionsContext.tsx` | Header action registration for save/cancel buttons |
 | `src/components/layout/TopHeader.tsx` | Unified header with logo, title, actions |
 | `src/components/layout/LeftNav.tsx` | Left sidebar navigation |
-| `src/components/chat/ChatMessage.tsx` | Chat bubble with markdown support |
+| `src/components/chat/ChatMessage.tsx` | Chat bubble with markdown support, inline image hover actions |
+| `src/components/chat/ChatInput.tsx` | Chat input with embedded style dropdown, generate imagery, +/mic/send |
+| `src/components/modals/InlineImageEditModal.tsx` | Edit images with reference + prompt |
 | `src/components/preview/ContentPreview.tsx` | Preview pane with markdown rendering |
 | `src/components/preview/ImageCard.tsx` | Displays 3 image variations for header/body |
 | `src/components/modals/` | Image generation modal components (5 files) |

@@ -25,8 +25,10 @@ import {
   ImageLightbox,
   EditImagePanel,
   RegeneratePopover,
+  InlineImageEditModal,
 } from '@/components/modals';
 import { toast } from 'sonner';
+import { apiClient } from '@/services/api';
 import type { ScreenType } from '@/hooks/useNavigation';
 import type { FileAttachment, ChatMessage } from '@/types/page';
 import type { ContentBlock } from '@/types/content';
@@ -41,6 +43,8 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
   const isImagePlanningRef = useRef(false);
+  // State for inline image editing modal
+  const [editingInlineImage, setEditingInlineImage] = useState<string | null>(null);
 
   const {
     page,
@@ -64,6 +68,8 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     setAllBlocks,
     reorderBlocks,
     deleteBlock,
+    addBlock,
+    updateBlock,
   } = useContentBlocks();
 
   // Image planning hook (conversational flow)
@@ -115,19 +121,29 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
   // Handle streaming content updates
   const handleContentStreaming = useCallback(
     (text: string) => {
-      console.log('[PageEditorScreen] handleContentStreaming', { textLength: text.length });
       updateGeneratedContent({ text, images: generatedContent.images });
+
+      // Also sync to content blocks if they exist (keeps header/body images intact)
+      const textBlock = blocks.find((b) => b.type === 'text');
+      if (textBlock) {
+        updateBlock(textBlock.id, { content: text });
+      }
     },
-    [updateGeneratedContent, generatedContent.images]
+    [updateGeneratedContent, generatedContent.images, blocks, updateBlock]
   );
 
   // Handle final content
   const handleContentGenerated = useCallback(
     async (content: { text: string; images: string[] }) => {
-      console.log('[PageEditorScreen] handleContentGenerated', { textLength: content.text.length });
       updateGeneratedContent({ text: content.text, images: [] });
+
+      // Also sync to content blocks if they exist
+      const textBlock = blocks.find((b) => b.type === 'text');
+      if (textBlock) {
+        updateBlock(textBlock.id, { content: content.text });
+      }
     },
-    [updateGeneratedContent]
+    [updateGeneratedContent, blocks, updateBlock]
   );
 
   const {
@@ -279,6 +295,86 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     }
   }, [generatedContent.text]);
 
+  // Handle selecting an inline image to add to content blocks
+  const handleSelectInlineImage = useCallback((imageUrl: string) => {
+    const newImageBlock: ContentBlock = {
+      type: 'image',
+      id: `img_inline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      imageUrl,
+      aspectRatio: '16:9', // Default for inline images
+      placementType: 'body',
+    };
+    addBlock(newImageBlock);
+    toast.success('Image added to content');
+  }, [addBlock]);
+
+  // Handle opening the edit modal for an inline image
+  const handleEditInlineImage = useCallback((imageUrl: string) => {
+    setEditingInlineImage(imageUrl);
+  }, []);
+
+  // Handle submitting an inline image edit
+  const handleSubmitInlineEdit = useCallback(async (editPrompt: string): Promise<string | null> => {
+    if (!editingInlineImage) return null;
+
+    try {
+      // Extract base64 from data URL if present
+      const base64Data = editingInlineImage.startsWith('data:')
+        ? editingInlineImage.split(',')[1]
+        : editingInlineImage;
+
+      const result = await apiClient.editImage({
+        referenceImage: base64Data,
+        editPrompt,
+        aspectRatio: '16:9',
+        placementType: 'body',
+      });
+
+      if (result.success && result.data) {
+        const newImageUrl = `data:${result.data.mimeType};base64,${result.data.base64Data}`;
+
+        // Add the edited image to the current assistant message
+        // Find the last assistant message and append the new image
+        setMessages((prev) => {
+          const lastAssistantIndex = prev.findIndex((m, i) =>
+            m.role === 'assistant' && i === prev.length - 1
+          );
+          if (lastAssistantIndex === -1) {
+            // If no assistant message exists, create a new one with the image
+            return [
+              ...prev,
+              {
+                id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                role: 'assistant' as const,
+                content: 'Here\'s your edited image:',
+                timestamp: new Date(),
+                images: [newImageUrl],
+              },
+            ];
+          }
+
+          // Add to existing last assistant message's images
+          return prev.map((msg, idx) => {
+            if (idx === prev.length - 1 && msg.role === 'assistant') {
+              return {
+                ...msg,
+                images: [...(msg.images || []), newImageUrl],
+              };
+            }
+            return msg;
+          });
+        });
+
+        return newImageUrl;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to edit image:', error);
+      throw error;
+    }
+  }, [editingInlineImage, setMessages]);
+
   if (!page) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -302,6 +398,10 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
             hasContent={!!generatedContent.text}
             isGeneratingImages={isGeneratingImages}
             onGenerateImages={handleGenerateImages}
+            onSelectImage={handleSelectInlineImage}
+            onEditImage={handleEditInlineImage}
+            onNavigateToStyle={() => onNavigate('style')}
+            onStyleChange={handleStyleChange}
           />
         </div>
 
@@ -311,9 +411,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
             content={generatedContent}
             isGenerating={isGenerating}
             onNavigateToVoice={() => onNavigate('voice')}
-            onNavigateToStyle={() => onNavigate('style')}
             onRegenerate={handleGenerateImages}
-            onStyleChange={handleStyleChange}
             contentBlocks={blocks}
             onReorderBlocks={reorderBlocks}
             onDeleteBlock={deleteBlock}
@@ -394,6 +492,14 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
           onClose={imageModal.closeRegenerate}
         />
       )}
+
+      {/* Inline Image Edit Modal */}
+      <InlineImageEditModal
+        isOpen={!!editingInlineImage}
+        imageUrl={editingInlineImage}
+        onSubmit={handleSubmitInlineEdit}
+        onClose={() => setEditingInlineImage(null)}
+      />
 
       {/* Discard Changes Dialog */}
       <AlertDialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>

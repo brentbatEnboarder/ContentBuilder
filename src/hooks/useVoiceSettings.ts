@@ -100,8 +100,26 @@ export const useVoiceSettings = () => {
       if (error) throw error;
       return newSettings;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['voiceSettings', customerId] });
+    // OPTIMISTIC UPDATE: Update cache BEFORE mutation completes
+    // This prevents the "bounce" effect where values revert temporarily
+    onMutate: async (newSettings) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['voiceSettings', customerId] });
+
+      // Snapshot the previous value
+      const previousSettings = queryClient.getQueryData(['voiceSettings', customerId]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(['voiceSettings', customerId], newSettings);
+
+      // Return context with the previous value
+      return { previousSettings };
+    },
+    onError: (_err, _newSettings, context) => {
+      // Rollback to the previous value on error
+      if (context?.previousSettings) {
+        queryClient.setQueryData(['voiceSettings', customerId], context.previousSettings);
+      }
     },
   });
 

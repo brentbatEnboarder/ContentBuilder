@@ -7,9 +7,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 interface ChatMessagesProps {
   messages: ChatMessageType[];
   isLoading: boolean;
+  onSelectImage?: (imageUrl: string) => void;
+  onEditImage?: (imageUrl: string) => void;
 }
 
-export const ChatMessages = ({ messages, isLoading }: ChatMessagesProps) => {
+export const ChatMessages = ({ messages, isLoading, onSelectImage, onEditImage }: ChatMessagesProps) => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,7 +30,12 @@ export const ChatMessages = ({ messages, isLoading }: ChatMessagesProps) => {
     <ScrollArea className="flex-1 px-4">
       <div className="flex flex-col gap-4 py-4">
         {messages.map((message) => (
-          <ChatMessage key={message.id} message={message} />
+          <ChatMessage
+            key={message.id}
+            message={message}
+            onSelectImage={onSelectImage}
+            onEditImage={onEditImage}
+          />
         ))}
         {showLoading && <LoadingMessage />}
         <div ref={bottomRef} />

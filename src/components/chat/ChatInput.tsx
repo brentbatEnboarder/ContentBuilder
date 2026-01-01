@@ -1,10 +1,10 @@
 import { useState, useRef, useCallback } from 'react';
-import { Paperclip, Mic, SendHorizontal, Link, ImageIcon, Loader2 } from 'lucide-react';
+import { Plus, Mic, SendHorizontal, Link, ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { FileChip } from './FileChip';
 import { FileDropZone } from './FileDropZone';
+import { StyleDropdown } from '@/components/preview/StyleDropdown';
 import { useInputDetection, useFileDropzone } from '@/hooks/useInputDetection';
 import type { FileAttachment } from '@/types/page';
 
@@ -14,6 +14,8 @@ interface ChatInputProps {
   hasContent?: boolean;
   isGeneratingImages?: boolean;
   onGenerateImages?: () => void;
+  onNavigateToStyle?: () => void;
+  onStyleChange?: () => void;
 }
 
 const generateFileId = () => `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -24,6 +26,8 @@ export const ChatInput = ({
   hasContent,
   isGeneratingImages,
   onGenerateImages,
+  onNavigateToStyle,
+  onStyleChange,
 }: ChatInputProps) => {
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
@@ -83,30 +87,6 @@ export const ChatInput = ({
     >
       <FileDropZone isDragOver={isDragOver} />
 
-      {/* Generate Imagery Button */}
-      {hasContent && onGenerateImages && (
-        <div className="mb-3">
-          <Button
-            variant="outline"
-            className="w-full gap-2"
-            onClick={onGenerateImages}
-            disabled={isGeneratingImages}
-          >
-            {isGeneratingImages ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Generating Images...
-              </>
-            ) : (
-              <>
-                <ImageIcon className="w-4 h-4" />
-                Generate Imagery
-              </>
-            )}
-          </Button>
-        </div>
-      )}
-
       <input
         ref={fileInputRef}
         type="file"
@@ -116,37 +96,7 @@ export const ChatInput = ({
         className="hidden"
       />
 
-      <div className="flex items-center gap-2 mb-2">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled}
-            >
-              <Paperclip className="w-4 h-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Attach file</TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              disabled
-            >
-              <Mic className="w-4 h-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Voice input (coming soon)</TooltipContent>
-        </Tooltip>
-      </div>
-
+      {/* File attachments */}
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2">
           {attachments.map(file => (
@@ -159,25 +109,93 @@ export const ChatInput = ({
         </div>
       )}
 
-      <div className="relative">
-        <Textarea
+      {/* Style Dropdown + Generate Imagery Button */}
+      <div className="flex items-center gap-2 mb-2">
+        {onNavigateToStyle && (
+          <StyleDropdown
+            onNavigateToSettings={onNavigateToStyle}
+            onStyleChange={onStyleChange}
+          />
+        )}
+        {onGenerateImages && (
+          <Button
+            variant="outline"
+            className="flex-1 gap-2"
+            onClick={onGenerateImages}
+            disabled={!hasContent || isGeneratingImages}
+          >
+            {isGeneratingImages ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <ImageIcon className="w-4 h-4" />
+                Generate Imagery
+              </>
+            )}
+          </Button>
+        )}
+      </div>
+
+      {/* Input box with embedded buttons */}
+      <div className="relative border border-border rounded-lg bg-background focus-within:ring-1 focus-within:ring-ring">
+        <textarea
           ref={textareaRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type, paste URL, or drop files..."
           disabled={disabled}
-          className="min-h-[80px] max-h-[160px] pr-12 resize-none"
+          className="w-full min-h-[80px] max-h-[160px] px-3 py-2 pb-10 bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground disabled:opacity-50"
           rows={2}
         />
-        <Button
-          size="icon"
-          className="absolute bottom-2 right-2 h-8 w-8"
-          onClick={handleSubmit}
-          disabled={!canSend}
-        >
-          <SendHorizontal className="w-4 h-4" />
-        </Button>
+
+        {/* Bottom row: Plus on left, Mic + Send on right */}
+        <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+          {/* Plus (attach) button - bottom left */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={disabled}
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Attach file</TooltipContent>
+          </Tooltip>
+
+          {/* Mic + Send buttons - bottom right */}
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  disabled
+                >
+                  <Mic className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Voice input (coming soon)</TooltipContent>
+            </Tooltip>
+
+            <Button
+              size="icon"
+              className="h-7 w-7"
+              onClick={handleSubmit}
+              disabled={!canSend}
+            >
+              <SendHorizontal className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
       </div>
 
       {hasUrl && (

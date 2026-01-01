@@ -20,7 +20,7 @@ const styleLabels: Record<ImageStyleType, string> = {
   isometric: 'Isometric',
   abstract: 'Abstract',
   handdrawn: 'Hand-drawn',
-  photo: 'Photorealistic',
+  photorealistic: 'Photorealistic',
   minimalist: 'Minimalist',
   warm: 'Warm',
 };

@@ -28,6 +28,7 @@ export function useImageModal(options: UseImageModalOptions = {}) {
   const [selectedImages, setSelectedImages] = useState<Record<string, string>>({});
   const [skippedPlacements, setSkippedPlacements] = useState<Set<string>>(new Set());
   const [currentStyleId, setCurrentStyleId] = useState<string>('flat');
+  const [isGeneratingMore, setIsGeneratingMore] = useState(false); // Background generation in progress
   const [progress, setProgress] = useState<GenerationProgress>({
     currentPlacement: 'header',
     completedImages: 0,
@@ -73,6 +74,7 @@ export function useImageModal(options: UseImageModalOptions = {}) {
     ) => {
       setModalState('generating');
       setCurrentStyleId(styleId);
+      setIsGeneratingMore(true);
       const totalImages = recommendations.length * 3;
 
       // Initialize placements with loading state
@@ -92,14 +94,18 @@ export function useImageModal(options: UseImageModalOptions = {}) {
       setSkippedPlacements(new Set());
 
       let completedCount = 0;
+      let firstBatchComplete = false;
 
       // Generate images for each placement sequentially
       for (const [idx, rec] of recommendations.entries()) {
+        const remainingPlacements = recommendations.length - idx;
         setProgress({
           currentPlacement: rec.type,
           completedImages: completedCount,
           totalImages,
-          message: `Generating ${rec.type} image${rec.type === 'header' ? '' : ` ${idx}`}...`,
+          message: firstBatchComplete
+            ? `Generating ${remainingPlacements} more image${remainingPlacements > 1 ? 's' : ''}...`
+            : `Generating ${rec.type} image...`,
           percent: Math.round((completedCount / totalImages) * 100),
         });
 
@@ -130,6 +136,12 @@ export function useImageModal(options: UseImageModalOptions = {}) {
               ...prev,
               [rec.id]: `${rec.id}-0`,
             }));
+
+            // After first successful batch, switch to selecting mode so user can interact
+            if (!firstBatchComplete) {
+              firstBatchComplete = true;
+              setModalState('selecting');
+            }
           }
         } catch (error) {
           console.error(`Failed to generate images for ${rec.id}:`, error);
@@ -141,6 +153,12 @@ export function useImageModal(options: UseImageModalOptions = {}) {
                 : p
             )
           );
+
+          // Even on error, switch to selecting mode so user can see what happened
+          if (!firstBatchComplete) {
+            firstBatchComplete = true;
+            setModalState('selecting');
+          }
         }
 
         completedCount += 3;
@@ -154,7 +172,7 @@ export function useImageModal(options: UseImageModalOptions = {}) {
         percent: 100,
       });
 
-      setModalState('selecting');
+      setIsGeneratingMore(false);
     },
     []
   );
@@ -379,6 +397,7 @@ export function useImageModal(options: UseImageModalOptions = {}) {
     setCurrentLightboxId(null);
     setEditingImage(null);
     setRegenerateData(null);
+    setIsGeneratingMore(false);
     setProgress({
       currentPlacement: 'header',
       completedImages: 0,
@@ -403,6 +422,7 @@ export function useImageModal(options: UseImageModalOptions = {}) {
     modalState,
     isOpen: modalState !== 'closed',
     isLoading: modalState === 'generating',
+    isGeneratingMore, // True while background generation continues after first batch
     placements,
     selectedImages,
     skippedPlacements,

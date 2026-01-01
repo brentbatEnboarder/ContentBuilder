@@ -47,6 +47,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     isDirty,
     generatedContent,
     isGenerating,
+    updateTitle,
     updateGeneratedContent,
     updateChatHistory,
     setIsGenerating,
@@ -183,6 +184,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
       onBack: handleBack,
       pageTitle: page?.title || 'Untitled Page',
       showSaved,
+      onTitleChange: updateTitle,
     }
   );
 
@@ -323,6 +325,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
         prompt={imageModal.placements[0]?.description || 'Generating images...'}
         progress={imageModal.progress}
         isLoading={imageModal.isLoading}
+        isGeneratingMore={imageModal.isGeneratingMore}
         hasGeneratedImages={imageModal.placements.some((p) => p.images.some((i) => i.url))}
       >
         <ImageSelectionGrid

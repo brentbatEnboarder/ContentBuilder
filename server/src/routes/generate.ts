@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import {
   generateContent,
   generateContentStream,
+  generateContentStreamWithTools,
   generateInterviewQuestion,
   generateTitle,
   analyzeContentForImages,
@@ -18,6 +19,7 @@ import {
   editImageWithReference,
   ImageGenError,
   GenerateImagesRequest,
+  buildImagePrompt,
 } from '../services/imageGen';
 
 const router = Router();
@@ -92,6 +94,24 @@ router.post('/text', async (req: Request, res: Response) => {
       }
     }
 
+    // Log the incoming chat message
+    console.log('\n' + '═'.repeat(60));
+    const conversationHistory = req.body.conversationHistory;
+    if (conversationHistory && conversationHistory.length > 0) {
+      console.log('[Chat] CONVERSATION HISTORY (' + conversationHistory.length + ' messages):');
+      for (const msg of conversationHistory) {
+        console.log(`  [${msg.role.toUpperCase()}]: ${msg.content.slice(0, 100)}${msg.content.length > 100 ? '...' : ''}`);
+      }
+      console.log('─'.repeat(60));
+    }
+    console.log('[Chat] USER MESSAGE:');
+    console.log('─'.repeat(60));
+    console.log(objective);
+    console.log('─'.repeat(60));
+    if (currentContent) {
+      console.log('[Chat] Has existing content:', currentContent.slice(0, 100) + '...');
+    }
+
     const request: GenerateContentRequest = {
       objective,
       companyProfile: {
@@ -113,6 +133,7 @@ router.post('/text', async (req: Request, res: Response) => {
       sourceMaterials,
       feedback,
       currentContent,
+      conversationHistory,
     };
 
     // Handle streaming response
@@ -122,11 +143,133 @@ router.post('/text', async (req: Request, res: Response) => {
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
 
+      // Check if tools should be enabled (default: true for chat)
+      const enableTools = req.body.enableTools !== false;
+
       try {
-        for await (const chunk of generateContentStream(request)) {
-          // Send SSE format
-          res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+        if (enableTools) {
+          // Use enhanced streaming with tool support
+          const defaultStyleId = imageStyle || 'flat';
+          const brandColors = {
+            primary: companyProfile.brandColors?.primary || '#7C21CC',
+            secondary: companyProfile.brandColors?.secondary || '',
+            accent: companyProfile.brandColors?.accent || '',
+          };
+
+          // Tool execution handler
+          const handleToolCall = async (
+            toolName: string,
+            toolInput: Record<string, unknown>
+          ): Promise<{
+            success: boolean;
+            imageBase64?: string;
+            mimeType?: string;
+            error?: string;
+          }> => {
+            if (toolName === 'generate_image') {
+              try {
+                console.log('[ToolCall] generate_image:', toolInput);
+
+                const imageRequest: GenerateImagesRequest = {
+                  contentSummary: toolInput.description as string,
+                  styleId: (toolInput.style as string) || defaultStyleId,
+                  brandColors,
+                  aspectRatio: (toolInput.aspectRatio as '1:1' | '16:9' | '4:3' | '3:2') || '16:9',
+                  count: 1, // Only generate 1 image for inline requests
+                };
+
+                const result = await generateImages(imageRequest);
+
+                if (result.images.length > 0) {
+                  return {
+                    success: true,
+                    imageBase64: result.images[0].base64Data,
+                    mimeType: result.images[0].mimeType,
+                  };
+                }
+
+                return {
+                  success: false,
+                  error: 'No image generated',
+                };
+              } catch (imgError) {
+                console.error('[ToolCall] Image generation failed:', imgError);
+                return {
+                  success: false,
+                  error: imgError instanceof Error ? imgError.message : 'Image generation failed',
+                };
+              }
+            }
+
+            return {
+              success: false,
+              error: `Unknown tool: ${toolName}`,
+            };
+          };
+
+          let fullResponseText = '';
+
+          for await (const event of generateContentStreamWithTools(
+            request,
+            defaultStyleId,
+            handleToolCall
+          )) {
+            switch (event.type) {
+              case 'text':
+                fullResponseText += event.text;
+                res.write(`data: ${JSON.stringify({ text: event.text })}\n\n`);
+                break;
+              case 'tool_use_start':
+                // Log tool invocation
+                console.log('[Chat] TOOL CALL:', event.toolName, '(id:', event.toolUseId + ')');
+                // Notify frontend that we're generating an image
+                res.write(
+                  `data: ${JSON.stringify({
+                    toolStart: {
+                      name: event.toolName,
+                      id: event.toolUseId,
+                    },
+                  })}\n\n`
+                );
+                break;
+              case 'tool_result':
+                // Log tool result
+                console.log('[Chat] TOOL RESULT:', event.result.toolName,
+                  event.result.result.success ? 'SUCCESS' : 'FAILED: ' + event.result.result.error);
+                // Send the generated image to the frontend
+                res.write(
+                  `data: ${JSON.stringify({
+                    toolResult: event.result,
+                  })}\n\n`
+                );
+                break;
+              case 'error':
+                console.log('[Chat] STREAM ERROR:', event.error);
+                res.write(`data: ${JSON.stringify({ error: event.error })}\n\n`);
+                break;
+              case 'done':
+                // Log the full response
+                console.log('\n[Chat] ASSISTANT RESPONSE:');
+                console.log('─'.repeat(60));
+                console.log(fullResponseText || '(no text response)');
+                console.log('═'.repeat(60) + '\n');
+                break;
+            }
+          }
+        } else {
+          // Use basic streaming without tools
+          let fullResponseText = '';
+          for await (const chunk of generateContentStream(request)) {
+            fullResponseText += chunk;
+            res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+          }
+          // Log the full response
+          console.log('\n[Chat] ASSISTANT RESPONSE:');
+          console.log('─'.repeat(60));
+          console.log(fullResponseText || '(no text response)');
+          console.log('═'.repeat(60) + '\n');
         }
+
         res.write('data: [DONE]\n\n');
         res.end();
       } catch (streamError) {

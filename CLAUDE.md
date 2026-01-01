@@ -102,6 +102,10 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 17. **Auto Page Titles** - AI generates descriptive titles on first save based on content
 18. **Image Planning** - Conversational flow: AI recommends images → user modifies via chat → approves → generates
 19. **Image Cards** - Header images at top, body images at bottom of preview, 3 variations each
+20. **Progressive Image Loading** - Images display immediately as they complete, with background progress bar for remaining
+21. **Inline Image Generation Tool** - Claude can generate images via tool call when user asks naturally (e.g., "generate an image of a dog")
+22. **Conversation History** - Chat maintains full conversation context so Claude remembers previous exchanges
+23. **Chat Logging** - Full conversation transcripts logged to backend for debugging
 
 ## Environment Variables
 
@@ -138,8 +142,49 @@ await apiClient.generateTextStream(
   request,
   (chunk) => { /* onChunk */ },
   (fullText) => { /* onComplete */ },
-  (error) => { /* onError */ }
+  (error) => { /* onError */ },
+  (toolName, toolId) => { /* onToolStart - optional */ },
+  (toolResult) => { /* onToolResult - optional */ }
 );
+```
+
+### Conversation History
+Chat maintains full conversation context so Claude remembers previous exchanges:
+- Frontend (`useChat.ts`) builds conversation history from previous messages
+- Backend passes history to Claude API as multi-turn messages
+- Enables follow-up questions and iterative content refinement
+
+### Inline Image Generation Tool
+Claude has a `generate_image` tool it can invoke during natural conversation:
+```
+User: "Generate an image of a happy dog"
+Claude: [uses generate_image tool] → Image appears inline in chat
+```
+
+Defined in `server/src/services/claude.ts` as `imageGenerationTool`. The tool:
+- Uses the customer's configured image style by default
+- Generates a single image (vs. 3 variations for planned images)
+- Displays inline in the chat message with click-to-expand lightbox
+
+### Chat Logging
+Full conversation transcripts are logged to the backend console for debugging:
+```
+════════════════════════════════════════════════════════════
+[Chat] CONVERSATION HISTORY (2 messages):
+  [ASSISTANT]: I'd love to help create...
+  [USER]: emphasize growth, normal tone...
+────────────────────────────────────────────────────────────
+[Chat] USER MESSAGE:
+────────────────────────────────────────────────────────────
+can we create a founding story page
+────────────────────────────────────────────────────────────
+[Chat] TOOL CALL: generate_image (id: toolu_123...)
+[Chat] TOOL RESULT: generate_image SUCCESS
+
+[Chat] ASSISTANT RESPONSE:
+────────────────────────────────────────────────────────────
+Here's your image!
+════════════════════════════════════════════════════════════
 ```
 
 ### Intelligent Scraper
@@ -307,7 +352,7 @@ npm install framer-motion @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
 | File | Purpose |
 |------|---------|
 | `src/App.tsx` | Root with QueryClient, routes |
-| `src/hooks/useChat.ts` | Chat with streaming Claude API, content tag parsing |
+| `src/hooks/useChat.ts` | Chat with streaming Claude API, content tag parsing, conversation history, inline images |
 | `src/hooks/useCompanySettings.ts` | Company settings + intelligent URL scanning |
 | `src/hooks/useImagePlanning.ts` | Conversational image planning state machine |
 | `src/hooks/useImageModal.ts` | Image generation modal state machine |
@@ -327,7 +372,7 @@ npm install framer-motion @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
 | `src/components/content/` | Draggable content components (4 files) |
 | `src/components/screens/PageEditorScreen.tsx` | Chat + preview split view for content creation |
 | `src/pages/CustomerSelection.tsx` | Customer selection with logos |
-| `server/src/services/claude.ts` | Claude API with content tags + image planning |
+| `server/src/services/claude.ts` | Claude API with content tags, image planning, generate_image tool |
 | `server/src/services/imageGen.ts` | Gemini image generation + editImageWithReference |
 | `server/src/services/intelligentScraper.ts` | Multi-page Claude-directed scraper |
 | `IMAGE_MODAL_IMPLEMENTATION.md` | Detailed implementation guide for remaining work |

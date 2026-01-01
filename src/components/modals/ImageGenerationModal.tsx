@@ -19,6 +19,7 @@ interface ImageGenerationModalProps {
   prompt: string;
   progress: GenerationProgress;
   isLoading: boolean;
+  isGeneratingMore?: boolean; // Background generation in progress after first batch
   hasGeneratedImages?: boolean;
   children?: React.ReactNode;
 }
@@ -226,6 +227,7 @@ export const ImageGenerationModal = ({
   prompt,
   progress,
   isLoading,
+  isGeneratingMore = false,
   hasGeneratedImages = false,
   children,
 }: ImageGenerationModalProps) => {
@@ -233,7 +235,7 @@ export const ImageGenerationModal = ({
   const [copied, setCopied] = useState(false);
 
   const handleClose = () => {
-    if (isLoading || hasGeneratedImages) {
+    if (isLoading || isGeneratingMore || hasGeneratedImages) {
       setShowConfirmDialog(true);
     } else {
       onClose();
@@ -355,7 +357,47 @@ export const ImageGenerationModal = ({
                   </div>
                 ) : (
                   /* Content area for image grid */
-                  <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
+                  <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                    {/* Background generation progress bar */}
+                    <AnimatePresence>
+                      {isGeneratingMore && (
+                        <motion.div
+                          className="mb-4 px-1"
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.3 }}
+                        >
+                          <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <motion.div
+                                  className="w-2 h-2 bg-primary rounded-full"
+                                  animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1] }}
+                                  transition={{ duration: 1, repeat: Infinity }}
+                                />
+                                <span className="text-sm font-medium text-foreground">
+                                  {progress.message}
+                                </span>
+                              </div>
+                              <div className="relative h-1.5 bg-muted rounded-full overflow-hidden">
+                                <motion.div
+                                  className="absolute inset-y-0 left-0 bg-primary rounded-full"
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${progress.percent}%` }}
+                                  transition={{ duration: 0.5, ease: 'easeOut' }}
+                                />
+                              </div>
+                            </div>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {progress.completedImages}/{progress.totalImages}
+                            </span>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    <div className="flex-1 min-h-0 overflow-auto">{children}</div>
+                  </div>
                 )}
               </div>
             </motion.div>
@@ -369,7 +411,7 @@ export const ImageGenerationModal = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Discard generated images?</AlertDialogTitle>
             <AlertDialogDescription>
-              {isLoading
+              {isLoading || isGeneratingMore
                 ? 'Image generation is still in progress. Are you sure you want to cancel?'
                 : "You haven't selected any images. Generated images will be discarded. Are you sure?"}
             </AlertDialogDescription>
@@ -380,7 +422,7 @@ export const ImageGenerationModal = ({
               onClick={handleConfirmClose}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isLoading ? 'Stop & Close' : 'Discard & Close'}
+              {isLoading || isGeneratingMore ? 'Stop & Close' : 'Discard & Close'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

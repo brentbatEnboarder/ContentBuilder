@@ -34,7 +34,7 @@ const styleOptions: StyleOption[] = [
     image: '/styles/handdrawn.jpg',
   },
   {
-    style: 'photo',
+    style: 'photorealistic',
     label: 'Photorealistic',
     image: '/styles/photo.jpg',
   },

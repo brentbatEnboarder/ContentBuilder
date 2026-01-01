@@ -9,7 +9,7 @@ export type ImageStyleType =
   | 'isometric'
   | 'abstract'
   | 'handdrawn'
-  | 'photo'
+  | 'photorealistic'
   | 'minimalist'
   | 'warm';
 

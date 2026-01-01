@@ -46,6 +46,7 @@ export interface GenerateContentRequest {
   sourceMaterials?: SourceMaterial[];
   feedback?: string; // For regeneration with user feedback
   currentContent?: string; // Previously generated content for context
+  conversationHistory?: { role: 'user' | 'assistant'; content: string }[]; // Previous messages in the chat
 }
 
 export interface GenerateContentResult {
@@ -140,6 +141,25 @@ Website: ${companyProfile.websiteUrl || 'Not specified'}
 - Accent: ${companyProfile.brandColors.accent || 'Not specified'}
 
 ${voicePrompt}
+
+## CRITICAL: Be Action-Oriented
+
+You are a CONTENT CREATOR, not an interviewer. Your primary job is to CREATE CONTENT, not ask questions.
+
+**When to generate content immediately (no questions):**
+- The request is reasonably clear (e.g., "create a welcome email", "write an onboarding guide")
+- You have enough company context from the profile above
+- You can make reasonable assumptions based on the content type
+
+**When to ask ONE round of clarifying questions:**
+- The request is genuinely ambiguous (multiple very different interpretations)
+- Critical details are missing that would significantly change the output
+
+**IMPORTANT: After the user answers your questions, GENERATE THE CONTENT.**
+- Do NOT ask follow-up questions after receiving answers
+- Do NOT ask for more specificity - use the information provided
+- If something is still unclear, make a reasonable assumption and proceed
+- The user answered your questions because they want content, not more questions
 
 ## CRITICAL: Response Format
 
@@ -331,12 +351,28 @@ export async function* generateContentStream(
   // Build message content (may include document blocks for PDFs)
   const messageContent = buildMessageContent(request);
 
+  // Build messages array including conversation history
+  const messages: Anthropic.MessageParam[] = [];
+
+  // Add conversation history if present
+  if (request.conversationHistory && request.conversationHistory.length > 0) {
+    for (const msg of request.conversationHistory) {
+      messages.push({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: msg.content,
+      });
+    }
+  }
+
+  // Add the current user message
+  messages.push({ role: 'user', content: messageContent });
+
   try {
     const stream = await client.messages.stream({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4096,
       system: systemPrompt,
-      messages: [{ role: 'user', content: messageContent }],
+      messages,
     });
 
     for await (const event of stream) {
@@ -714,5 +750,210 @@ export class ClaudeError extends Error {
     super(message);
     this.name = 'ClaudeError';
     this.code = code;
+  }
+}
+
+// ============================================================================
+// Image Generation Tool for Claude
+// ============================================================================
+
+/**
+ * Tool definition for image generation
+ */
+export const imageGenerationTool: Anthropic.Tool = {
+  name: 'generate_image',
+  description: `Generate an image based on a text description. Use this tool when the user asks you to create, generate, or make an image. The image will be generated using AI and displayed to the user.
+
+Examples of when to use this tool:
+- "Generate an image of a dog playing fetch"
+- "Create a picture of a sunset over mountains"
+- "Make me an illustration of a team meeting"
+- "Can you draw a robot?"
+
+Do NOT use this tool when:
+- The user is just discussing images conceptually
+- The user is asking about existing images
+- The user wants to plan images for content (use the image planning flow instead)`,
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      description: {
+        type: 'string',
+        description: 'A detailed description of the image to generate. Be specific about subjects, style, colors, composition, and mood.',
+      },
+      style: {
+        type: 'string',
+        enum: ['corporate', 'flat', 'isometric', 'abstract', 'handdrawn', 'photorealistic', 'minimalist', 'warm'],
+        description: 'The visual style for the image. Defaults to the user\'s configured style if not specified.',
+      },
+      aspectRatio: {
+        type: 'string',
+        enum: ['1:1', '16:9', '4:3', '3:2', '9:16', '21:9'],
+        description: 'The aspect ratio for the image. Use 16:9 for landscapes/headers, 1:1 for square, 9:16 for portraits. Defaults to 16:9.',
+      },
+    },
+    required: ['description'],
+  },
+};
+
+/**
+ * Result of a tool execution
+ */
+export interface ToolExecutionResult {
+  toolName: string;
+  toolUseId: string;
+  result: {
+    success: boolean;
+    imageBase64?: string;
+    mimeType?: string;
+    error?: string;
+  };
+}
+
+/**
+ * Streaming event types when tools are involved
+ */
+export type StreamEvent =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use_start'; toolName: string; toolUseId: string }
+  | { type: 'tool_result'; result: ToolExecutionResult }
+  | { type: 'done' }
+  | { type: 'error'; error: string };
+
+/**
+ * Generate streaming content with tool support
+ * This is an enhanced version of generateContentStream that can handle tool calls
+ */
+export async function* generateContentStreamWithTools(
+  request: GenerateContentRequest,
+  defaultStyleId: string = 'flat',
+  onToolCall?: (toolName: string, toolInput: Record<string, unknown>) => Promise<{
+    success: boolean;
+    imageBase64?: string;
+    mimeType?: string;
+    error?: string;
+  }>
+): AsyncGenerator<StreamEvent, void, unknown> {
+  const client = getClaudeClient();
+
+  const systemPrompt = buildSystemPrompt(
+    request.companyProfile,
+    request.voiceSettings
+  );
+
+  // Build message content for the current user message
+  const messageContent = buildMessageContent(request);
+
+  // Build messages array including conversation history
+  const messages: Anthropic.MessageParam[] = [];
+
+  // Add conversation history if present
+  if (request.conversationHistory && request.conversationHistory.length > 0) {
+    for (const msg of request.conversationHistory) {
+      messages.push({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: msg.content,
+      });
+    }
+  }
+
+  // Add the current user message
+  messages.push({ role: 'user', content: messageContent });
+
+  // Add tool context to system prompt
+  const enhancedSystemPrompt = `${systemPrompt}
+
+## Image Generation Capability
+You have access to an image generation tool. When the user asks you to generate, create, or make an image, use the generate_image tool. After the image is generated, briefly acknowledge it was created.
+
+Default image style: ${defaultStyleId}`;
+
+  try {
+    const stream = await client.messages.stream({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      system: enhancedSystemPrompt,
+      messages,
+      tools: [imageGenerationTool],
+    });
+
+    let currentToolUseId: string | null = null;
+    let currentToolName: string | null = null;
+    let toolInputJson = '';
+
+    for await (const event of stream) {
+      if (event.type === 'content_block_start') {
+        if (event.content_block.type === 'tool_use') {
+          currentToolUseId = event.content_block.id;
+          currentToolName = event.content_block.name;
+          toolInputJson = '';
+          yield { type: 'tool_use_start', toolName: currentToolName, toolUseId: currentToolUseId };
+        }
+      } else if (event.type === 'content_block_delta') {
+        if (event.delta.type === 'text_delta') {
+          yield { type: 'text', text: event.delta.text };
+        } else if (event.delta.type === 'input_json_delta') {
+          toolInputJson += event.delta.partial_json;
+        }
+      } else if (event.type === 'content_block_stop') {
+        // If we were building a tool call, execute it now
+        if (currentToolUseId && currentToolName && onToolCall) {
+          try {
+            const toolInput = JSON.parse(toolInputJson);
+
+            // Apply default style if not specified
+            if (!toolInput.style) {
+              toolInput.style = defaultStyleId;
+            }
+            if (!toolInput.aspectRatio) {
+              toolInput.aspectRatio = '16:9';
+            }
+
+            const result = await onToolCall(currentToolName, toolInput);
+
+            yield {
+              type: 'tool_result',
+              result: {
+                toolName: currentToolName,
+                toolUseId: currentToolUseId,
+                result,
+              },
+            };
+          } catch (parseError) {
+            yield {
+              type: 'tool_result',
+              result: {
+                toolName: currentToolName,
+                toolUseId: currentToolUseId,
+                result: {
+                  success: false,
+                  error: 'Failed to parse tool input',
+                },
+              },
+            };
+          }
+
+          currentToolUseId = null;
+          currentToolName = null;
+          toolInputJson = '';
+        }
+      }
+    }
+
+    yield { type: 'done' };
+  } catch (error) {
+    if (error instanceof Anthropic.APIError) {
+      if (error.status === 429) {
+        yield { type: 'error', error: 'Rate limit exceeded. Please try again in a moment.' };
+        return;
+      }
+      yield { type: 'error', error: `API error: ${error.message}` };
+      return;
+    }
+
+    yield {
+      type: 'error',
+      error: `Streaming failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    };
   }
 }

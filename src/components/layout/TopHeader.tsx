@@ -1,5 +1,7 @@
-import { ArrowLeft, Loader2, Check } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { ArrowLeft, Loader2, Check, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
 import type { ScreenType } from '@/hooks/useNavigation';
 
@@ -35,7 +37,13 @@ export const TopHeader = ({ activeScreen }: TopHeaderProps) => {
   const { actions } = useHeaderActions();
   const config = screenConfig[activeScreen] || { title: 'Company Info' };
 
+  // Editing state for page title
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const isPageEditor = activeScreen === 'new-page' || activeScreen === 'page-editor';
+  const canEditTitle = isPageEditor && actions?.onTitleChange;
 
   // For page editor, show save button when dirty or just saved
   // For other screens, only show when there are changes
@@ -45,6 +53,39 @@ export const TopHeader = ({ activeScreen }: TopHeaderProps) => {
 
   // Use page title from actions if available (for page editor)
   const displayTitle = actions?.pageTitle || config.title;
+
+  // Start editing when clicking the title
+  const handleTitleClick = () => {
+    if (canEditTitle) {
+      setEditValue(displayTitle);
+      setIsEditing(true);
+    }
+  };
+
+  // Commit changes on blur or Enter
+  const handleEditComplete = () => {
+    if (editValue.trim() && editValue !== displayTitle) {
+      actions?.onTitleChange?.(editValue.trim());
+    }
+    setIsEditing(false);
+  };
+
+  // Cancel on Escape
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleEditComplete();
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+    }
+  };
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
 
   return (
     <header className="h-16 bg-card border-b border-border flex items-center px-4 shrink-0">
@@ -72,9 +113,30 @@ export const TopHeader = ({ activeScreen }: TopHeaderProps) => {
       {/* Title & Subtitle - Center */}
       <div className="flex-1 flex justify-center">
         <div className="text-center">
-          <h1 className="text-lg font-semibold text-foreground leading-tight">
-            {displayTitle}
-          </h1>
+          {isEditing ? (
+            <Input
+              ref={inputRef}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={handleEditComplete}
+              onKeyDown={handleKeyDown}
+              className="text-lg font-semibold text-center h-8 w-64"
+              placeholder="Enter page title"
+            />
+          ) : (
+            <h1
+              className={`text-lg font-semibold text-foreground leading-tight inline-flex items-center gap-2 ${
+                canEditTitle ? 'cursor-pointer hover:text-muted-foreground group' : ''
+              }`}
+              onClick={handleTitleClick}
+              title={canEditTitle ? 'Click to edit title' : undefined}
+            >
+              {displayTitle}
+              {canEditTitle && (
+                <Pencil className="w-3.5 h-3.5 opacity-0 group-hover:opacity-50 transition-opacity" />
+              )}
+            </h1>
+          )}
           {config.subtitle && !isPageEditor && (
             <p className="text-sm text-muted-foreground leading-tight">
               {config.subtitle}

@@ -9,6 +9,7 @@ interface HeaderActions {
   onBack?: () => void;
   pageTitle?: string;
   showSaved?: boolean;
+  onTitleChange?: (title: string) => void;
 }
 
 interface HeaderActionsContextType {
@@ -70,6 +71,7 @@ export const useRegisterHeaderActions = (
     onBack?: () => void;
     pageTitle?: string;
     showSaved?: boolean;
+    onTitleChange?: (title: string) => void;
   }
 ) => {
   const { registerActions, clearActions } = useHeaderActions();
@@ -83,8 +85,9 @@ export const useRegisterHeaderActions = (
       onBack: options?.onBack,
       pageTitle: options?.pageTitle,
       showSaved: options?.showSaved,
+      onTitleChange: options?.onTitleChange,
     });
-  }, [hasChanges, isSaving, onSave, onCancel, options?.onBack, options?.pageTitle, options?.showSaved, registerActions]);
+  }, [hasChanges, isSaving, onSave, onCancel, options?.onBack, options?.pageTitle, options?.showSaved, options?.onTitleChange, registerActions]);
 
   useEffect(() => {
     return () => clearActions();

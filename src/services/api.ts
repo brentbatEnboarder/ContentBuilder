@@ -229,12 +229,24 @@ export const apiClient = {
   /**
    * Generate text content with SSE streaming
    * Uses native fetch instead of axios for proper stream handling
+   * Supports tool use (e.g., inline image generation)
    */
   generateTextStream: async (
     params: Omit<GenerateTextRequest, 'stream'>,
     onChunk: (text: string) => void,
     onComplete: (fullText: string) => void,
-    onError: (error: Error) => void
+    onError: (error: Error) => void,
+    onToolStart?: (toolName: string, toolId: string) => void,
+    onToolResult?: (result: {
+      toolName: string;
+      toolUseId: string;
+      result: {
+        success: boolean;
+        imageBase64?: string;
+        mimeType?: string;
+        error?: string;
+      };
+    }) => void
   ): Promise<void> => {
     const token = await getAuthToken();
     let fullText = '';
@@ -292,6 +304,14 @@ export const apiClient = {
             if (data.text) {
               fullText += data.text;
               onChunk(data.text);
+            }
+            // Handle tool start event
+            if (data.toolStart && onToolStart) {
+              onToolStart(data.toolStart.name, data.toolStart.id);
+            }
+            // Handle tool result event (e.g., generated image)
+            if (data.toolResult && onToolResult) {
+              onToolResult(data.toolResult);
             }
           } catch (parseError) {
             // Skip malformed JSON

@@ -134,6 +134,16 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
           ? await processAttachments(attachments)
           : undefined;
 
+        // Build conversation history from previous messages (excluding system messages and current)
+        // Get messages before we added the user message and assistant placeholder
+        const previousMessages = messages.slice(0, -2); // Exclude the just-added user message and assistant placeholder
+        const conversationHistory = previousMessages
+          .filter((msg) => msg.role !== 'system')
+          .map((msg) => ({
+            role: msg.role as 'user' | 'assistant',
+            content: msg.content,
+          }));
+
         // Build request with current settings
         const request = {
           objective: content,
@@ -147,9 +157,11 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
           imageStyle: styleSettings.selectedStyle,
           sourceMaterials,
           currentContent: currentContent || undefined,
+          conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
         };
 
         let fullText = '';
+        const generatedImages: string[] = [];
 
         // Stream the response
         await apiClient.generateTextStream(
@@ -188,7 +200,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === assistantMessageId
-                  ? { ...msg, content: finalChatMessage }
+                  ? { ...msg, content: finalChatMessage, isGeneratingImage: false }
                   : msg
               )
             );
@@ -215,10 +227,57 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
                   ? {
                       ...msg,
                       content: `Sorry, I encountered an error: ${err.message}. Please try again.`,
+                      isGeneratingImage: false,
                     }
                   : msg
               )
             );
+          },
+          // onToolStart - Claude is calling a tool (e.g., generate_image)
+          (toolName: string, _toolId: string) => {
+            if (toolName === 'generate_image') {
+              // Show generating indicator
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, isGeneratingImage: true }
+                    : msg
+                )
+              );
+            }
+          },
+          // onToolResult - Tool execution completed
+          (result) => {
+            if (result.toolName === 'generate_image' && result.result.success) {
+              const imageUrl = `data:${result.result.mimeType};base64,${result.result.imageBase64}`;
+              generatedImages.push(imageUrl);
+
+              // Add image to the message
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMessageId
+                    ? {
+                        ...msg,
+                        images: [...(msg.images || []), imageUrl],
+                        isGeneratingImage: false,
+                      }
+                    : msg
+                )
+              );
+            } else if (result.toolName === 'generate_image' && !result.result.success) {
+              // Image generation failed
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMessageId
+                    ? {
+                        ...msg,
+                        isGeneratingImage: false,
+                        content: msg.content + `\n\n*Image generation failed: ${result.result.error}*`,
+                      }
+                    : msg
+                )
+              );
+            }
           }
         );
       } catch (err) {

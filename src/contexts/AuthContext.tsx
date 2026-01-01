@@ -8,6 +8,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  loginWithGoogle: () => Promise<{ error: AuthError | null }>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -59,6 +60,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
+  const loginWithGoogle = async () => {
+    setError(null);
+    setLoading(true);
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/`,
+      },
+    });
+
+    if (error) {
+      setError(getErrorMessage(error));
+      setLoading(false);
+      return { error };
+    }
+
+    // Note: loading will be reset by the auth state change listener after redirect
+    return { error: null };
+  };
+
   const logout = async () => {
     setError(null);
     await supabase.auth.signOut();
@@ -68,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, error, login, logout, clearError }}
+      value={{ user, session, loading, error, login, loginWithGoogle, logout, clearError }}
     >
       {children}
     </AuthContext.Provider>

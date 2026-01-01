@@ -242,8 +242,21 @@ export const apiClient = {
       toolUseId: string;
       result: {
         success: boolean;
+        // Image generation results
         imageBase64?: string;
         mimeType?: string;
+        // Web search results
+        searchResults?: Array<{
+          title: string;
+          url: string;
+          snippet: string;
+        }>;
+        // URL scraping results
+        scrapedContent?: {
+          title: string;
+          content: string;
+          url: string;
+        };
         error?: string;
       };
     }) => void

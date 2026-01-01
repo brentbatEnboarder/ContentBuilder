@@ -64,8 +64,9 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 ### Backend Services (`/server/src/services`)
 - **`scraper.ts`** - Basic Firecrawl scraping (legacy)
 - **`intelligentScraper.ts`** - Multi-page Claude-directed scraping with SSE streaming
-- **`claude.ts`** - Claude API text generation with streaming
+- **`claude.ts`** - Claude API text generation with streaming, tools (web_search, scrape_url, generate_image)
 - **`imageGen.ts`** - Gemini image generation
+- **`webSearch.ts`** - Brave Search API for web search tool
 - **`whisper.ts`** - OpenAI Whisper transcription
 - **`fileProcessor.ts`** - PDF/DOCX/TXT/PPTX processing
 
@@ -118,6 +119,10 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 32. **Improved Image Planning Format** - AI recommendations use numbered lists with bold headers for better readability
 33. **Image Modal Style Dropdown** - Each placement group has its own style dropdown next to "Regenerate All"
 34. **Stricter Image Tool Triggers** - Claude only invokes generate_image when user explicitly mentions image/picture/diagram/etc.
+35. **Web Search Tool** - Claude can search the web for current information when user asks (uses Brave Search API)
+36. **URL Scraping Tool** - Claude can fetch and read content from specific URLs when user provides a link
+37. **Login Screen Redesign** - Split layout with dark left panel (logo, title, form) and hero image on right
+38. **Google Authentication** - OAuth login via Supabase with "Continue with Google" button
 
 ## Environment Variables
 
@@ -132,6 +137,7 @@ ANTHROPIC_API_KEY=...
 OPENAI_API_KEY=...
 GOOGLE_API_KEY=...       # Google Gemini API key for image generation (Nano Banana Pro)
 FIRECRAWL_API_KEY=...
+BRAVE_SEARCH_API_KEY=... # Brave Search API key for web search (get free key at https://brave.com/search/api/)
 ```
 
 ## Coding Patterns

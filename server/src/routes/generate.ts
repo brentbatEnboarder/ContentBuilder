@@ -22,6 +22,8 @@ import {
   GenerateImagesRequest,
   buildImagePrompt,
 } from '../services/imageGen';
+import { searchWeb, formatSearchResults, WebSearchError } from '../services/webSearch';
+import { scrapeWebsite, ScraperError } from '../services/scraper';
 
 const router = Router();
 
@@ -166,8 +168,11 @@ router.post('/text', async (req: Request, res: Response) => {
             success: boolean;
             imageBase64?: string;
             mimeType?: string;
+            searchResults?: Array<{ title: string; url: string; snippet: string }>;
+            scrapedContent?: { title: string; content: string; url: string };
             error?: string;
           }> => {
+            // Handle image generation tool
             if (toolName === 'generate_image') {
               try {
                 console.log('[ToolCall] generate_image:', toolInput);
@@ -199,6 +204,57 @@ router.post('/text', async (req: Request, res: Response) => {
                 return {
                   success: false,
                   error: imgError instanceof Error ? imgError.message : 'Image generation failed',
+                };
+              }
+            }
+
+            // Handle web search tool
+            if (toolName === 'web_search') {
+              try {
+                const query = toolInput.query as string;
+                const maxResults = (toolInput.maxResults as number) || 5;
+                console.log('[ToolCall] web_search:', { query, maxResults });
+
+                const searchResponse = await searchWeb(query, maxResults);
+
+                return {
+                  success: true,
+                  searchResults: searchResponse.results,
+                };
+              } catch (searchError) {
+                console.error('[ToolCall] Web search failed:', searchError);
+                return {
+                  success: false,
+                  error: searchError instanceof WebSearchError
+                    ? searchError.message
+                    : 'Web search failed',
+                };
+              }
+            }
+
+            // Handle URL scraping tool
+            if (toolName === 'scrape_url') {
+              try {
+                const url = toolInput.url as string;
+                console.log('[ToolCall] scrape_url:', { url });
+
+                const scrapeResult = await scrapeWebsite(url);
+
+                return {
+                  success: true,
+                  scrapedContent: {
+                    title: scrapeResult.metadata.title || 'Untitled Page',
+                    content: scrapeResult.profile,
+                    url: scrapeResult.url,
+                  },
+                };
+              } catch (scrapeError) {
+                console.error('[ToolCall] URL scraping failed:', scrapeError);
+                return {
+                  success: false,
+                  error: scrapeError instanceof ScraperError
+                    ? scrapeError.message
+                    : 'URL scraping failed',
                 };
               }
             }

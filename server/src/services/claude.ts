@@ -768,8 +768,87 @@ export class ClaudeError extends Error {
 }
 
 // ============================================================================
-// Image Generation Tool for Claude
+// Tools for Claude
 // ============================================================================
+
+/**
+ * Tool definition for web search
+ * Allows Claude to search the web for current information
+ */
+export const webSearchTool: Anthropic.Tool = {
+  name: 'web_search',
+  description: `Search the web for current information on any topic.
+
+Use this tool when:
+- The user asks about recent events, news, or current information
+- The user needs up-to-date data that may not be in your training data
+- The user explicitly asks you to "search", "look up", or "find" something online
+- You need to verify or update information
+- The user asks about specific companies, products, or people and wants current info
+
+Examples of when to USE this tool:
+- "Search for the latest news about Tesla"
+- "Look up the current CEO of Microsoft"
+- "Find information about recent AI developments"
+- "What's the weather in Sydney?" (redirect to search for current data)
+- "Search for reviews of the iPhone 15"
+
+Do NOT use this tool when:
+- The user is asking you to create content (use your knowledge instead)
+- The question is about general knowledge that doesn't need current data
+- The user specifically says they don't want a web search`,
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      query: {
+        type: 'string',
+        description: 'The search query. Be specific and include relevant keywords for better results.',
+      },
+      maxResults: {
+        type: 'number',
+        description: 'Maximum number of results to return (1-10). Defaults to 5.',
+      },
+    },
+    required: ['query'],
+  },
+};
+
+/**
+ * Tool definition for URL scraping
+ * Allows Claude to fetch and extract content from a specific URL
+ */
+export const scrapeUrlTool: Anthropic.Tool = {
+  name: 'scrape_url',
+  description: `Fetch and extract content from a specific webpage URL.
+
+Use this tool when:
+- The user provides a specific URL and asks you to read/analyze it
+- The user says "check this link", "read this page", or "what's on this website"
+- You need to get detailed content from a specific webpage
+- The user wants to reference content from a particular article or page
+
+Examples of when to USE this tool:
+- "Read this article: https://example.com/article"
+- "What does this page say? [URL]"
+- "Summarize the content at https://..."
+- "Check out this website and tell me about it"
+- "Extract the main points from this URL"
+
+Do NOT use this tool when:
+- The user hasn't provided a specific URL
+- The user just wants general information (use web_search instead)
+- The URL appears to be a file download (PDF, etc.)`,
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      url: {
+        type: 'string',
+        description: 'The full URL to scrape (must start with http:// or https://)',
+      },
+    },
+    required: ['url'],
+  },
+};
 
 /**
  * Tool definition for image generation
@@ -834,8 +913,22 @@ export interface ToolExecutionResult {
   toolUseId: string;
   result: {
     success: boolean;
+    // Image generation results
     imageBase64?: string;
     mimeType?: string;
+    // Web search results
+    searchResults?: Array<{
+      title: string;
+      url: string;
+      snippet: string;
+    }>;
+    // URL scraping results
+    scrapedContent?: {
+      title: string;
+      content: string;
+      url: string;
+    };
+    // Error message
     error?: string;
   };
 }
@@ -893,20 +986,27 @@ export async function* generateContentStreamWithTools(
   // Add tool context to system prompt
   const enhancedSystemPrompt = `${systemPrompt}
 
-## Image Generation Capability
+## Available Tools
+
+### Image Generation
 You have access to an image generation tool, but ONLY use it when the user EXPLICITLY asks for a visual output.
-
 The user must use words like: "image", "picture", "photo", "illustration", "drawing", "diagram", "chart", "graphic", "visual", or verbs like "draw", "illustrate".
+DO NOT use the image tool for requests like "Create a page about X" - that's text content, not an image.
+Default image style: ${defaultStyleId}
 
-DO NOT use the image tool for requests like:
-- "Create a page about X" (this is text content)
-- "Make content for Y" (this is text content)
-- "Do a page on Z" (this is text content)
-- Any request that doesn't explicitly mention wanting an image/picture/illustration/diagram
+### Web Search
+You can search the web for current information when the user:
+- Asks about recent events, news, or current data
+- Explicitly asks you to "search", "look up", or "find" something online
+- Needs up-to-date information that may have changed since your training
 
-When in doubt, create TEXT content. Only generate images when the user clearly asks for one.
+### URL Scraping
+You can fetch and read content from specific URLs when the user:
+- Provides a URL and asks you to read, analyze, or summarize it
+- Says things like "check this link", "read this page", "what's on this website"
+- Wants you to reference content from a particular webpage
 
-Default image style: ${defaultStyleId}`;
+When using these tools, always explain what you found to the user in a helpful way.`;
 
   // Log the full system prompt and messages being sent
   console.log('\n' + '═'.repeat(80));
@@ -929,7 +1029,7 @@ Default image style: ${defaultStyleId}`;
       max_tokens: 4096,
       system: enhancedSystemPrompt,
       messages,
-      tools: [imageGenerationTool],
+      tools: [imageGenerationTool, webSearchTool, scrapeUrlTool],
     });
 
     let currentToolUseId: string | null = null;

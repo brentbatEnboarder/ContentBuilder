@@ -139,7 +139,10 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     initialMessages: page?.chatHistory || [],
     onContentGenerated: handleContentGenerated,
     onContentStreaming: handleContentStreaming,
+    onTitleSuggested: updateTitle,
     currentContent: generatedContent.text || undefined,
+    currentTitle: page?.title,
+    imageStyle: styleSettings.selectedStyle, // Pass style directly to avoid sync issues
   });
 
   // Sync chat messages to page editor state

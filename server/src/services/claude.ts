@@ -868,6 +868,21 @@ You have access to an image generation tool. When the user asks you to generate,
 
 Default image style: ${defaultStyleId}`;
 
+  // Log the full system prompt and messages being sent
+  console.log('\n' + '═'.repeat(80));
+  console.log('[Claude API] SYSTEM PROMPT:');
+  console.log('─'.repeat(80));
+  console.log(enhancedSystemPrompt);
+  console.log('─'.repeat(80));
+  console.log('[Claude API] MESSAGES (' + messages.length + ' total):');
+  for (const msg of messages) {
+    const contentPreview = typeof msg.content === 'string'
+      ? msg.content.slice(0, 200) + (msg.content.length > 200 ? '...' : '')
+      : '[complex content]';
+    console.log(`  [${msg.role.toUpperCase()}]: ${contentPreview}`);
+  }
+  console.log('═'.repeat(80) + '\n');
+
   try {
     const stream = await client.messages.stream({
       model: 'claude-sonnet-4-20250514',

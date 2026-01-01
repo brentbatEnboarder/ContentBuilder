@@ -39,13 +39,19 @@ interface UseChatOptions {
   initialMessages?: ChatMessage[];
   onContentGenerated?: (content: { text: string; images: string[] }) => void;
   onContentStreaming?: (content: string) => void;
+  onTitleSuggested?: (title: string) => void;
   currentContent?: string;
+  currentTitle?: string; // Used to check if we should suggest a new title
+  imageStyle?: string; // Override image style (use this to ensure style changes are immediate)
 }
 
-export const useChat = ({ initialMessages = [], onContentGenerated, onContentStreaming, currentContent }: UseChatOptions = {}) => {
+export const useChat = ({ initialMessages = [], onContentGenerated, onContentStreaming, onTitleSuggested, currentContent, currentTitle, imageStyle }: UseChatOptions = {}) => {
   const { settings: companySettings } = useCompanySettings();
   const { settings: voiceSettings } = useVoiceSettings();
   const { settings: styleSettings } = useStyleSettings();
+
+  // Use the passed imageStyle prop if provided, otherwise fall back to hook's styleSettings
+  const effectiveImageStyle = imageStyle || styleSettings.selectedStyle;
 
   const [messages, setMessages] = useState<ChatMessage[]>(
     initialMessages.length > 0
@@ -154,7 +160,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
             respect: voiceSettings.respect,
             enthusiasm: voiceSettings.enthusiasm,
           },
-          imageStyle: styleSettings.selectedStyle,
+          imageStyle: effectiveImageStyle,
           sourceMaterials,
           currentContent: currentContent || undefined,
           conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
@@ -211,6 +217,19 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
                 text: previewContent,
                 images: [],
               });
+
+              // Auto-generate title suggestion if current title is default
+              if (onTitleSuggested && (!currentTitle || currentTitle === 'Untitled Page')) {
+                apiClient.generateTitle(previewContent)
+                  .then((suggestedTitle) => {
+                    if (suggestedTitle && suggestedTitle !== 'Untitled Page') {
+                      onTitleSuggested(suggestedTitle);
+                    }
+                  })
+                  .catch((err) => {
+                    console.error('Failed to generate title suggestion:', err);
+                  });
+              }
             }
           },
           // onError
@@ -297,7 +316,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
         );
       }
     },
-    [companySettings, voiceSettings, styleSettings, onContentGenerated, onContentStreaming, currentContent]
+    [companySettings, voiceSettings, effectiveImageStyle, onContentGenerated, onContentStreaming, onTitleSuggested, currentContent, currentTitle]
   );
 
   /**
@@ -366,7 +385,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
             respect: voiceSettings.respect,
             enthusiasm: voiceSettings.enthusiasm,
           },
-          imageStyle: styleSettings.selectedStyle,
+          imageStyle: effectiveImageStyle,
           sourceMaterials: sourceMaterials.length > 0 ? sourceMaterials : undefined,
           currentContent: currentContent || undefined,
         };
@@ -419,6 +438,19 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
                 text: previewContent,
                 images: [],
               });
+
+              // Auto-generate title suggestion if current title is default
+              if (onTitleSuggested && (!currentTitle || currentTitle === 'Untitled Page')) {
+                apiClient.generateTitle(previewContent)
+                  .then((suggestedTitle) => {
+                    if (suggestedTitle && suggestedTitle !== 'Untitled Page') {
+                      onTitleSuggested(suggestedTitle);
+                    }
+                  })
+                  .catch((err) => {
+                    console.error('Failed to generate title suggestion:', err);
+                  });
+              }
             }
           },
           (err: Error) => {
@@ -450,7 +482,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
         );
       }
     },
-    [companySettings, voiceSettings, styleSettings, onContentGenerated, onContentStreaming, currentContent]
+    [companySettings, voiceSettings, effectiveImageStyle, onContentGenerated, onContentStreaming, onTitleSuggested, currentContent, currentTitle]
   );
 
   const addSystemMessage = useCallback((content: string) => {

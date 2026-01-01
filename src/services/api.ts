@@ -338,6 +338,89 @@ export const apiClient = {
   },
 
   /**
+   * Generate images with SSE streaming - returns each image as it completes
+   * This provides faster perceived performance by showing images immediately
+   */
+  generateImagesStream: async (
+    params: GenerateImagesRequest,
+    onImage: (image: GeneratedImage, variationIndex: number, totalCount: number) => void,
+    onComplete: (duration: number) => void,
+    onError: (error: string, variationIndex?: number) => void
+  ): Promise<void> => {
+    const token = await getAuthToken();
+
+    try {
+      const response = await fetch('/api/generate/images/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(params),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Response body is not readable');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete SSE messages (each ends with \n\n)
+        const messages = buffer.split('\n\n');
+        buffer = messages.pop() || ''; // Keep incomplete message in buffer
+
+        for (const message of messages) {
+          if (!message.trim()) continue;
+
+          // Parse SSE format: "data: {...}"
+          const dataMatch = message.match(/^data:\s*(.+)$/m);
+          if (!dataMatch) continue;
+
+          const dataStr = dataMatch[1].trim();
+          if (dataStr === '[DONE]') {
+            continue;
+          }
+
+          try {
+            const event = JSON.parse(dataStr);
+
+            switch (event.type) {
+              case 'image':
+                if (event.image) {
+                  onImage(event.image, event.variationIndex, event.totalCount);
+                }
+                break;
+              case 'error':
+                onError(event.error || 'Unknown error', event.variationIndex);
+                break;
+              case 'complete':
+                onComplete(event.duration || 0);
+                break;
+            }
+          } catch (parseError) {
+            console.warn('Failed to parse SSE message:', dataStr);
+          }
+        }
+      }
+    } catch (error) {
+      onError(error instanceof Error ? error.message : String(error));
+    }
+  },
+
+  /**
    * Regenerate a single image
    */
   regenerateImage: async (params: {

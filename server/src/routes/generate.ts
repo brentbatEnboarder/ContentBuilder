@@ -15,6 +15,7 @@ import {
 } from '../services/claude';
 import {
   generateImages,
+  generateImagesStreaming,
   regenerateSingleImage,
   editImageWithReference,
   ImageGenError,
@@ -719,6 +720,146 @@ router.post('/images', async (req: Request, res: Response) => {
       success: false,
       error: 'Failed to generate images',
     });
+  }
+});
+
+/**
+ * POST /api/generate/images/stream
+ * Generate images with SSE streaming - returns each image as it completes
+ * This provides faster perceived performance by showing images as they're ready
+ *
+ * Request body: Same as /api/generate/images
+ * Response: SSE stream with events:
+ *   - { type: 'image', variationIndex, totalCount, image: { id, base64Data, mimeType } }
+ *   - { type: 'error', variationIndex, error }
+ *   - { type: 'complete', totalCount, duration }
+ */
+router.post('/images/stream', async (req: Request, res: Response) => {
+  try {
+    const {
+      contentSummary,
+      styleId,
+      customPrompt,
+      brandColors,
+      aspectRatio,
+      count,
+    } = req.body;
+
+    // Validate required fields
+    if (!contentSummary || typeof contentSummary !== 'string') {
+      res.status(400).json({
+        success: false,
+        error: 'Missing or invalid contentSummary',
+      });
+      return;
+    }
+
+    if (!styleId || typeof styleId !== 'string') {
+      res.status(400).json({
+        success: false,
+        error: 'Missing or invalid styleId',
+      });
+      return;
+    }
+
+    // Validate styleId
+    const validStyles = [
+      'corporate',
+      'flat',
+      'isometric',
+      'abstract',
+      'handdrawn',
+      'photorealistic',
+      'minimalist',
+      'warm',
+    ];
+    if (!validStyles.includes(styleId)) {
+      res.status(400).json({
+        success: false,
+        error: `Invalid styleId. Must be one of: ${validStyles.join(', ')}`,
+      });
+      return;
+    }
+
+    // Validate aspectRatio if provided
+    const validAspectRatios = ['1:1', '16:9', '4:3', '3:2', '9:16', '21:9'];
+    if (aspectRatio && !validAspectRatios.includes(aspectRatio)) {
+      res.status(400).json({
+        success: false,
+        error: `Invalid aspectRatio. Must be one of: ${validAspectRatios.join(', ')}`,
+      });
+      return;
+    }
+
+    // Set up SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+    const request: GenerateImagesRequest = {
+      contentSummary,
+      styleId,
+      customPrompt,
+      brandColors: brandColors
+        ? {
+            primary: brandColors.primary || '#7C21CC',
+            secondary: brandColors.secondary || '',
+            accent: brandColors.accent || '',
+          }
+        : undefined,
+      aspectRatio: aspectRatio as '1:1' | '16:9' | '4:3' | '3:2' | undefined,
+      count: count || 3,
+    };
+
+    console.log(
+      `[ImageGen] SSE Stream: Generating ${request.count} images with style: ${styleId}`
+    );
+    const startTime = Date.now();
+
+    // Stream images as they complete
+    for await (const event of generateImagesStreaming(request)) {
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    }
+
+    const duration = Date.now() - startTime;
+    console.log(`[ImageGen] SSE Stream: Complete in ${duration}ms`);
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (error) {
+    console.error('Generate images stream error:', error);
+
+    // If headers haven't been sent, we can send an error response
+    if (!res.headersSent) {
+      if (error instanceof ImageGenError) {
+        const statusCode =
+          error.code === 'RATE_LIMIT'
+            ? 429
+            : error.code === 'AUTH_ERROR'
+              ? 401
+              : error.code === 'CONFIG_ERROR'
+                ? 503
+                : 500;
+
+        res.status(statusCode).json({
+          success: false,
+          error: error.message,
+          code: error.code,
+        });
+        return;
+      }
+
+      res.status(500).json({
+        success: false,
+        error: 'Failed to generate images',
+      });
+      return;
+    }
+
+    // If headers were sent, send error via SSE
+    res.write(`data: ${JSON.stringify({ type: 'error', error: 'Stream failed' })}\n\n`);
+    res.end();
   }
 });
 

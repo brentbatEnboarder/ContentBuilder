@@ -66,6 +66,7 @@ export function useImageModal(options: UseImageModalOptions = {}) {
   }, [placements]);
 
   // Start image generation from recommendations
+  // Now launches ALL placement requests in parallel for maximum speed
   const startGeneration = useCallback(
     async (
       recommendations: ImageRecommendation[],
@@ -93,76 +94,144 @@ export function useImageModal(options: UseImageModalOptions = {}) {
       setSelectedImages({});
       setSkippedPlacements(new Set());
 
+      // Track completion for progress updates
       let completedCount = 0;
       let firstBatchComplete = false;
 
-      // Generate images for each placement sequentially
-      for (const [idx, rec] of recommendations.entries()) {
-        const remainingPlacements = recommendations.length - idx;
-        setProgress({
-          currentPlacement: rec.type,
-          completedImages: completedCount,
-          totalImages,
-          message: firstBatchComplete
-            ? `Generating ${remainingPlacements} more image${remainingPlacements > 1 ? 's' : ''}...`
-            : `Generating ${rec.type} image...`,
-          percent: Math.round((completedCount / totalImages) * 100),
-        });
+      setProgress({
+        currentPlacement: 'header',
+        completedImages: 0,
+        totalImages,
+        message: `Generating ${recommendations.length} images in parallel...`,
+        percent: 0,
+      });
 
-        try {
-          const response = await apiClient.generateImages({
-            contentSummary: rec.description,
-            styleId,
-            brandColors,
-            aspectRatio: (rec.type === 'header' ? '21:9' : rec.aspectRatio) as AspectRatio,
-            count: 3,
-          });
+      console.log(`[ImageModal] Starting PARALLEL generation for ${recommendations.length} placements`);
+      const startTime = Date.now();
 
-          if (response.success && response.data) {
-            // Convert base64 to data URLs
-            const images = response.data.images.map((img, i) => ({
-              id: `${rec.id}-${i}`,
-              url: `data:${img.mimeType};base64,${img.base64Data}`,
-              isLoading: false,
-              prompt: rec.description,
-            }));
+      // Create a streaming promise for each placement - all run in parallel
+      // Uses SSE streaming to show each image as soon as it's ready
+      const placementPromises = recommendations.map(async (rec) => {
+        let placementImagesCompleted = 0;
 
-            setPlacements((prev) =>
-              prev.map((p, i) => (i === idx ? { ...p, images } : p))
-            );
+        return new Promise<{ success: boolean; recId: string; error?: string }>((resolve) => {
+          apiClient.generateImagesStream(
+            {
+              contentSummary: rec.description,
+              styleId,
+              brandColors,
+              aspectRatio: (rec.type === 'header' ? '21:9' : rec.aspectRatio) as AspectRatio,
+              count: 3,
+            },
+            // onImage - called for each image as it completes
+            (image, variationIndex, _totalCount) => {
+              const imageUrl = `data:${image.mimeType};base64,${image.base64Data}`;
 
-            // Auto-select the first image for each placement
-            setSelectedImages((prev) => ({
-              ...prev,
-              [rec.id]: `${rec.id}-0`,
-            }));
+              // Update this specific image slot immediately
+              setPlacements((prev) =>
+                prev.map((p) => {
+                  if (p.id !== rec.id) return p;
+                  const newImages = [...p.images];
+                  newImages[variationIndex] = {
+                    id: `${rec.id}-${variationIndex}`,
+                    url: imageUrl,
+                    isLoading: false,
+                    prompt: rec.description,
+                  };
+                  return { ...p, images: newImages };
+                })
+              );
 
-            // After first successful batch, switch to selecting mode so user can interact
-            if (!firstBatchComplete) {
-              firstBatchComplete = true;
-              setModalState('selecting');
+              placementImagesCompleted++;
+              completedCount++;
+
+              // Auto-select the first image when it arrives
+              if (variationIndex === 0) {
+                setSelectedImages((prev) => ({
+                  ...prev,
+                  [rec.id]: `${rec.id}-0`,
+                }));
+              }
+
+              // Update progress
+              const remainingImages = totalImages - completedCount;
+              setProgress({
+                currentPlacement: rec.type,
+                completedImages: completedCount,
+                totalImages,
+                message: remainingImages > 0
+                  ? `${remainingImages} image${remainingImages > 1 ? 's' : ''} remaining...`
+                  : 'Finishing up...',
+                percent: Math.round((completedCount / totalImages) * 100),
+              });
+
+              // After first image arrives, switch to selecting mode
+              if (!firstBatchComplete) {
+                firstBatchComplete = true;
+                setModalState('selecting');
+                console.log(`[ImageModal] First image arrived, switching to selecting mode`);
+              }
+            },
+            // onComplete - called when all images for this placement are done
+            (_duration) => {
+              resolve({ success: placementImagesCompleted > 0, recId: rec.id });
+            },
+            // onError - called on errors
+            (error, variationIndex) => {
+              console.error(`Failed to generate image for ${rec.id}:`, error);
+
+              if (variationIndex !== undefined) {
+                // Mark specific image as failed
+                setPlacements((prev) =>
+                  prev.map((p) => {
+                    if (p.id !== rec.id) return p;
+                    const newImages = [...p.images];
+                    newImages[variationIndex] = {
+                      ...newImages[variationIndex],
+                      isLoading: false,
+                    };
+                    return { ...p, images: newImages };
+                  })
+                );
+                completedCount++;
+              } else {
+                // Mark all images as failed
+                setPlacements((prev) =>
+                  prev.map((p) =>
+                    p.id === rec.id
+                      ? { ...p, images: p.images.map((img) => ({ ...img, isLoading: false })) }
+                      : p
+                  )
+                );
+                completedCount += 3;
+              }
+
+              setProgress((prev) => ({
+                ...prev,
+                completedImages: completedCount,
+                percent: Math.round((completedCount / totalImages) * 100),
+              }));
+
+              // Even on error, switch to selecting mode
+              if (!firstBatchComplete) {
+                firstBatchComplete = true;
+                setModalState('selecting');
+              }
+
+              resolve({ success: false, recId: rec.id, error });
             }
-          }
-        } catch (error) {
-          console.error(`Failed to generate images for ${rec.id}:`, error);
-          // Mark images as failed (keep loading false but empty URL)
-          setPlacements((prev) =>
-            prev.map((p, i) =>
-              i === idx
-                ? { ...p, images: p.images.map((img) => ({ ...img, isLoading: false })) }
-                : p
-            )
           );
+        });
+      });
 
-          // Even on error, switch to selecting mode so user can see what happened
-          if (!firstBatchComplete) {
-            firstBatchComplete = true;
-            setModalState('selecting');
-          }
-        }
+      // Wait for all placements to complete (success or failure)
+      const results = await Promise.allSettled(placementPromises);
 
-        completedCount += 3;
-      }
+      const duration = Date.now() - startTime;
+      const successCount = results.filter(
+        (r) => r.status === 'fulfilled' && r.value.success
+      ).length;
+      console.log(`[ImageModal] Completed ${successCount}/${recommendations.length} placements in ${duration}ms (parallel)`);
 
       setProgress({
         currentPlacement: 'body',

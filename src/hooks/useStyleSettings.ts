@@ -83,8 +83,10 @@ export const useStyleSettings = () => {
       if (error) throw error;
       return newSettings;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['styleSettings', customerId] });
+    onSuccess: (newSettings) => {
+      // Immediately update the cache so all hook instances see the new value
+      // This prevents race conditions where other hooks still see the old value
+      queryClient.setQueryData(['styleSettings', customerId], newSettings);
     },
   });
 

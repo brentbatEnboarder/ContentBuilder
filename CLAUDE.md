@@ -76,7 +76,8 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 - **POST /api/generate/title** - Generate page title from content
 - **POST /api/generate/image-plan** - Analyze content and recommend images
 - **POST /api/generate/image-plan/continue** - Continue image planning conversation
-- **POST /api/generate/images** - Gemini image generation
+- **POST /api/generate/images** - Gemini image generation (parallel variations)
+- **POST /api/generate/images/stream** - SSE streaming image generation (returns each image as it completes)
 - **POST /api/transcribe** - Whisper transcription
 - **POST /api/process/file** - File content extraction
 
@@ -99,13 +100,16 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 14. **Chat Styling** - Enboarder avatar (#7C21CC), light purple AI bubbles (#e0c4f4), markdown support
 15. **Conversational Editing** - Current content passed to AI for follow-up modifications
 16. **Customer Selection UI** - Shows customer logos (from company_info) in selection cards
-17. **Auto Page Titles** - AI generates descriptive titles on first save based on content
+17. **Auto Page Titles** - AI generates descriptive titles immediately when content is generated (updates title bar in real-time)
 18. **Image Planning** - Conversational flow: AI recommends images → user modifies via chat → approves → generates
 19. **Image Cards** - Header images at top, body images at bottom of preview, 3 variations each
 20. **Progressive Image Loading** - Images display immediately as they complete, with background progress bar for remaining
 21. **Inline Image Generation Tool** - Claude can generate images via tool call when user asks naturally (e.g., "generate an image of a dog")
 22. **Conversation History** - Chat maintains full conversation context so Claude remembers previous exchanges
 23. **Chat Logging** - Full conversation transcripts logged to backend for debugging
+24. **Parallel Image Generation** - All image variations and placements generate simultaneously (~3x faster)
+25. **SSE Image Streaming** - Images appear one-by-one as they complete via Server-Sent Events
+26. **Claude API Logging** - Full system prompts and messages logged to backend console for debugging
 
 ## Environment Variables
 
@@ -346,6 +350,47 @@ npm install framer-motion @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
 - **Header images:** Always use `21:9` ultrawide
 - **Body images:** Use AI-recommended ratio from supported list
 - **Documentation:** See `3rd_Party_Docs/GEMINI_IMAGE_GENERATION_API.md`
+
+### Parallel Image Generation
+Image generation uses a two-level parallelization strategy for maximum speed:
+
+1. **Backend (`imageGen.ts`)**: `generateImages()` uses `Promise.all()` to generate all 3 variations simultaneously
+2. **Frontend (`useImageModal.ts`)**: All placement requests launch in parallel, updating UI as each completes
+
+```typescript
+// Backend: generateImagesStreaming() yields images as they complete
+for await (const event of generateImagesStreaming(request)) {
+  res.write(`data: ${JSON.stringify(event)}\n\n`);
+}
+
+// Frontend: generateImagesStream() with callbacks
+apiClient.generateImagesStream(
+  params,
+  (image, index, total) => { /* onImage - update UI immediately */ },
+  (duration) => { /* onComplete */ },
+  (error, index) => { /* onError */ }
+);
+```
+
+**Performance improvement**: 3 placements × 3 variations went from ~3 minutes (sequential) to ~30 seconds (parallel).
+
+### Claude API Logging
+Full system prompts and messages are logged to the backend console:
+```
+════════════════════════════════════════════════════════════════════════════════
+[Claude API] SYSTEM PROMPT:
+────────────────────────────────────────────────────────────────────────────────
+You are an expert content writer for Enboarder...
+## Company Context
+...
+## Brand Voice Guidelines
+...
+────────────────────────────────────────────────────────────────────────────────
+[Claude API] MESSAGES (2 total):
+  [ASSISTANT]: What content would you like to create today?...
+  [USER]: ## Content Request...
+════════════════════════════════════════════════════════════════════════════════
+```
 
 ## Key Files
 

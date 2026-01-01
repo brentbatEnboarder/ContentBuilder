@@ -141,7 +141,69 @@ function generateImageId(): string {
 }
 
 /**
+ * Generate a single image variation
+ * Internal helper for parallel generation
+ */
+async function generateSingleVariation(
+  client: GoogleGenAI,
+  prompt: string,
+  variationIndex: number,
+  totalCount: number,
+  aspectRatio: string
+): Promise<GeneratedImage> {
+  // Add variation instruction for non-first images
+  const variedPrompt =
+    variationIndex === 0
+      ? prompt
+      : `${prompt}\n\nThis is variation ${variationIndex + 1} of ${totalCount}. Create a distinctly different composition while maintaining the same style and theme.`;
+
+  console.log(`[ImageGen] Starting image ${variationIndex + 1}/${totalCount}...`);
+  const startTime = Date.now();
+
+  const response = await client.models.generateContent({
+    model: IMAGE_MODEL,
+    contents: variedPrompt,
+    config: {
+      responseModalities: ['TEXT', 'IMAGE'],
+      imageConfig: {
+        aspectRatio: aspectRatio,
+        imageSize: '1K',
+      },
+    },
+  });
+
+  // Extract image from response
+  const candidate = response.candidates?.[0];
+  if (!candidate?.content?.parts) {
+    throw new ImageGenError(
+      `No content in response for image ${variationIndex + 1}`,
+      'INVALID_RESPONSE'
+    );
+  }
+
+  // Find the image part in the response
+  for (const part of candidate.content.parts) {
+    if (part.inlineData) {
+      const duration = Date.now() - startTime;
+      console.log(`[ImageGen] Completed image ${variationIndex + 1}/${totalCount} in ${duration}ms`);
+      return {
+        id: generateImageId(),
+        base64Data: part.inlineData.data as string,
+        mimeType: part.inlineData.mimeType || 'image/png',
+        prompt: variedPrompt,
+      };
+    }
+  }
+
+  throw new ImageGenError(
+    `No image data in response for image ${variationIndex + 1}`,
+    'INVALID_RESPONSE'
+  );
+}
+
+/**
  * Generate images using Gemini's image generation API (Nano Banana)
+ * Now generates all variations in parallel for faster results
  */
 export async function generateImages(
   request: GenerateImagesRequest
@@ -161,59 +223,40 @@ export async function generateImages(
   console.log('─'.repeat(60));
   console.log(prompt);
   console.log('─'.repeat(60));
-
-  const images: GeneratedImage[] = [];
+  console.log(`[ImageGen] Generating ${count} images in PARALLEL...`);
+  const overallStartTime = Date.now();
 
   try {
-    // Generate multiple images (each API call generates one image)
-    // We generate them sequentially to avoid rate limiting
-    for (let i = 0; i < count; i++) {
-      // Add variation to each image prompt
-      const variedPrompt =
-        i === 0
-          ? prompt
-          : `${prompt}\n\nThis is variation ${i + 1} of ${count}. Create a distinctly different composition while maintaining the same style and theme.`;
+    // Generate all variations in parallel using Promise.all
+    const imagePromises = Array.from({ length: count }, (_, i) =>
+      generateSingleVariation(client, prompt, i, count, aspectRatio)
+    );
 
-      console.log(`[ImageGen] Generating image ${i + 1}/${count}...`);
+    // Wait for all images to complete (or fail)
+    const results = await Promise.allSettled(imagePromises);
 
-      const response = await client.models.generateContent({
-        model: IMAGE_MODEL,
-        contents: variedPrompt,
-        config: {
-          responseModalities: ['TEXT', 'IMAGE'],
-          imageConfig: {
-            aspectRatio: aspectRatio,
-            imageSize: '1K',
-          },
-        },
-      });
+    // Collect successful images
+    const images: GeneratedImage[] = [];
+    const errors: string[] = [];
 
-      // Extract image from response
-      const candidate = response.candidates?.[0];
-      if (!candidate?.content?.parts) {
-        throw new ImageGenError(
-          `No content in response for image ${i + 1}`,
-          'INVALID_RESPONSE'
-        );
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        images.push(result.value);
+      } else {
+        const errorMsg = result.reason instanceof Error
+          ? result.reason.message
+          : 'Unknown error';
+        errors.push(`Image ${index + 1}: ${errorMsg}`);
+        console.error(`[ImageGen] Failed to generate image ${index + 1}:`, errorMsg);
       }
+    });
 
-      // Find the image part in the response
-      for (const part of candidate.content.parts) {
-        if (part.inlineData) {
-          images.push({
-            id: generateImageId(),
-            base64Data: part.inlineData.data as string,
-            mimeType: part.inlineData.mimeType || 'image/png',
-            prompt: variedPrompt,
-          });
-          break;
-        }
-      }
-    }
+    const overallDuration = Date.now() - overallStartTime;
+    console.log(`[ImageGen] Completed ${images.length}/${count} images in ${overallDuration}ms (parallel)`);
 
     if (images.length === 0) {
       throw new ImageGenError(
-        'No images were generated',
+        `No images were generated. Errors: ${errors.join('; ')}`,
         'GENERATION_FAILED'
       );
     }
@@ -262,6 +305,107 @@ export async function generateImages(
       'GENERATION_FAILED'
     );
   }
+}
+
+/**
+ * Streaming image event types for SSE
+ */
+export interface ImageStreamEvent {
+  type: 'image' | 'complete' | 'error';
+  variationIndex?: number;
+  totalCount?: number;
+  image?: GeneratedImage;
+  error?: string;
+  duration?: number;
+}
+
+/**
+ * Generate images with streaming - yields each image as it completes
+ * Uses an async generator pattern for SSE streaming
+ */
+export async function* generateImagesStreaming(
+  request: GenerateImagesRequest
+): AsyncGenerator<ImageStreamEvent> {
+  const client = getGenAIClient();
+  const count = request.count || 3;
+  const aspectRatio = request.aspectRatio || '16:9';
+
+  const prompt = buildImagePrompt(
+    request.contentSummary,
+    request.styleId,
+    request.brandColors,
+    request.customPrompt
+  );
+
+  console.log('[ImageGen] Streaming mode - Base prompt:');
+  console.log('─'.repeat(60));
+  console.log(prompt);
+  console.log('─'.repeat(60));
+  console.log(`[ImageGen] Generating ${count} images in PARALLEL with streaming...`);
+  const overallStartTime = Date.now();
+
+  // Track which images have been yielded
+  const yieldedIndices = new Set<number>();
+  let completedCount = 0;
+
+  // Create promises for all variations
+  const imagePromises = Array.from({ length: count }, async (_, i) => {
+    try {
+      const image = await generateSingleVariation(client, prompt, i, count, aspectRatio);
+      return { index: i, image, error: null };
+    } catch (error) {
+      return {
+        index: i,
+        image: null,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  });
+
+  // Race all promises and yield as each completes
+  const pendingPromises = [...imagePromises];
+
+  while (pendingPromises.length > 0) {
+    // Race to find the first completed promise
+    const result = await Promise.race(
+      pendingPromises.map(async (p, idx) => {
+        const res = await p;
+        return { promiseIndex: idx, ...res };
+      })
+    );
+
+    // Remove the completed promise from pending
+    pendingPromises.splice(result.promiseIndex, 1);
+
+    completedCount++;
+
+    if (result.image) {
+      yieldedIndices.add(result.index);
+      yield {
+        type: 'image',
+        variationIndex: result.index,
+        totalCount: count,
+        image: result.image,
+      };
+    } else {
+      console.error(`[ImageGen] Streaming: Image ${result.index + 1} failed:`, result.error);
+      yield {
+        type: 'error',
+        variationIndex: result.index,
+        totalCount: count,
+        error: result.error || 'Image generation failed',
+      };
+    }
+  }
+
+  const overallDuration = Date.now() - overallStartTime;
+  console.log(`[ImageGen] Streaming complete: ${yieldedIndices.size}/${count} images in ${overallDuration}ms`);
+
+  yield {
+    type: 'complete',
+    totalCount: count,
+    duration: overallDuration,
+  };
 }
 
 /**

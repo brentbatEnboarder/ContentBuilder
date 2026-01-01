@@ -83,10 +83,26 @@ export const useStyleSettings = () => {
       if (error) throw error;
       return newSettings;
     },
-    onSuccess: (newSettings) => {
-      // Immediately update the cache so all hook instances see the new value
-      // This prevents race conditions where other hooks still see the old value
+    // OPTIMISTIC UPDATE: Update cache BEFORE mutation completes
+    // This ensures all hook instances see the new value immediately
+    onMutate: async (newSettings) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['styleSettings', customerId] });
+
+      // Snapshot the previous value
+      const previousSettings = queryClient.getQueryData(['styleSettings', customerId]);
+
+      // Optimistically update to the new value
       queryClient.setQueryData(['styleSettings', customerId], newSettings);
+
+      // Return context with the previous value
+      return { previousSettings };
+    },
+    onError: (_err, _newSettings, context) => {
+      // Rollback to the previous value on error
+      if (context?.previousSettings) {
+        queryClient.setQueryData(['styleSettings', customerId], context.previousSettings);
+      }
     },
   });
 
@@ -107,9 +123,13 @@ export const useStyleSettings = () => {
     }
   }, [savedSettings]);
 
+  // Use savedSettings as the primary value (shared via React Query cache)
+  // This ensures all hook instances see the same value immediately after save
+  const currentSettings = savedSettings || defaultSettings;
+
   return {
-    settings: draft,
-    savedSettings: savedSettings || defaultSettings,
+    settings: currentSettings, // Changed: use cached value, not local draft
+    savedSettings: currentSettings,
     isLoading,
     isSaving: saveMutation.isPending,
     hasChanges,

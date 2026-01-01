@@ -151,6 +151,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
           }));
 
         // Build request with current settings
+        console.log('[useChat] Sending request with imageStyle:', effectiveImageStyle);
         const request = {
           objective: content,
           companyProfile: buildCompanyProfile(),

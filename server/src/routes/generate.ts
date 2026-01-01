@@ -97,6 +97,7 @@ router.post('/text', async (req: Request, res: Response) => {
 
     // Log the incoming chat message
     console.log('\n' + '═'.repeat(60));
+    console.log('[Chat] IMAGE STYLE FROM REQUEST:', imageStyle || '(not provided, will use flat)');
     const conversationHistory = req.body.conversationHistory;
     if (conversationHistory && conversationHistory.length > 0) {
       console.log('[Chat] CONVERSATION HISTORY (' + conversationHistory.length + ' messages):');

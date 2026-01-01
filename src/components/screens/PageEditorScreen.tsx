@@ -230,6 +230,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
               }
             : undefined;
 
+          console.log('[PageEditorScreen] Starting image generation with style:', styleSettings.selectedStyle);
           imageModal.startGeneration(
             recommendations,
             styleSettings.selectedStyle,

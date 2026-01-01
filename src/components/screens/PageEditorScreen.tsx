@@ -101,10 +101,10 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
       };
 
       // Header images first, then text, then body images
-      setAllBlocks([...headerBlocks, textBlock, ...bodyBlocks]);
+      const allBlocks = [...headerBlocks, textBlock, ...bodyBlocks];
+      setAllBlocks(allBlocks);
 
-      // IMPORTANT: Also sync images to generatedContent so they get saved
-      // Extract image URLs from the image blocks for persistence
+      // IMPORTANT: Save BOTH flat image URLs AND full contentBlocks for persistence
       const imageUrls = imageBlocks
         .filter((b): b is ContentBlock & { type: 'image' } => b.type === 'image')
         .map((b) => b.imageUrl);
@@ -112,16 +112,36 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
       updateGeneratedContent({
         text: generatedContent?.text || '',
         images: imageUrls,
+        contentBlocks: allBlocks, // Save full blocks with placement info
       });
 
       toast.success('Images applied to content!');
     },
   });
 
+  // Restore content blocks from saved page on load
+  useEffect(() => {
+    if (generatedContent.contentBlocks && generatedContent.contentBlocks.length > 0 && blocks.length === 0) {
+      console.log('[PageEditorScreen] Restoring content blocks from saved page', {
+        blockCount: generatedContent.contentBlocks.length,
+      });
+      setAllBlocks(generatedContent.contentBlocks);
+    }
+  }, [generatedContent.contentBlocks, blocks.length, setAllBlocks]);
+
   // Handle streaming content updates
   const handleContentStreaming = useCallback(
     (text: string) => {
-      updateGeneratedContent({ text, images: generatedContent.images });
+      // Update text but preserve images and blocks
+      const updatedBlocks = blocks.length > 0
+        ? blocks.map(b => b.type === 'text' ? { ...b, content: text } : b)
+        : generatedContent.contentBlocks;
+
+      updateGeneratedContent({
+        text,
+        images: generatedContent.images,
+        contentBlocks: updatedBlocks,
+      });
 
       // Also sync to content blocks if they exist (keeps header/body images intact)
       const textBlock = blocks.find((b) => b.type === 'text');
@@ -129,13 +149,22 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
         updateBlock(textBlock.id, { content: text });
       }
     },
-    [updateGeneratedContent, generatedContent.images, blocks, updateBlock]
+    [updateGeneratedContent, generatedContent.images, generatedContent.contentBlocks, blocks, updateBlock]
   );
 
   // Handle final content
   const handleContentGenerated = useCallback(
     async (content: { text: string; images: string[] }) => {
-      updateGeneratedContent({ text: content.text, images: [] });
+      // Preserve existing contentBlocks, just update the text in them
+      const updatedBlocks = blocks.length > 0
+        ? blocks.map(b => b.type === 'text' ? { ...b, content: content.text } : b)
+        : generatedContent.contentBlocks;
+
+      updateGeneratedContent({
+        text: content.text,
+        images: generatedContent.images, // Keep existing images
+        contentBlocks: updatedBlocks,
+      });
 
       // Also sync to content blocks if they exist
       const textBlock = blocks.find((b) => b.type === 'text');
@@ -143,7 +172,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
         updateBlock(textBlock.id, { content: content.text });
       }
     },
-    [updateGeneratedContent, blocks, updateBlock]
+    [updateGeneratedContent, generatedContent.images, generatedContent.contentBlocks, blocks, updateBlock]
   );
 
   const {
@@ -295,6 +324,43 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     }
   }, [generatedContent.text]);
 
+  // Handle approving image plan via the "Go" button
+  const handleApproveImagePlan = useCallback(async () => {
+    if (!isImagePlanningRef.current || imagePlanState !== 'planning') return;
+
+    // Add user approval message to chat
+    addMessage('user', 'Go ahead!');
+
+    // Send approval to planning flow
+    const result = await sendPlanMessage(generatedContent.text, 'go ahead');
+
+    if (result) {
+      // Add AI response
+      addMessage('assistant', result.message);
+
+      if (result.isApproval) {
+        // Start image generation
+        isImagePlanningRef.current = false;
+        addMessage('assistant', "Great! Opening the image generator. I'll create 3 variations for each placement so you can choose your favorites.");
+
+        const recommendations = getRecommendationsForModal();
+        const brandColors = companySettings.colors
+          ? {
+              primary: companySettings.colors.primary,
+              secondary: companySettings.colors.secondary,
+              accent: companySettings.colors.accent,
+            }
+          : undefined;
+
+        imageModal.startGeneration(
+          recommendations,
+          styleSettings.selectedStyle,
+          brandColors
+        );
+      }
+    }
+  }, [imagePlanState, sendPlanMessage, generatedContent.text, getRecommendationsForModal, companySettings.colors, styleSettings.selectedStyle, imageModal, addMessage]);
+
   // Handle selecting an inline image to add to content blocks
   const handleSelectInlineImage = useCallback((imageUrl: string) => {
     const newImageBlock: ContentBlock = {
@@ -402,6 +468,8 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
             onEditImage={handleEditInlineImage}
             onNavigateToStyle={() => onNavigate('style')}
             onStyleChange={handleStyleChange}
+            isImagePlanning={imagePlanState === 'planning'}
+            onApproveImagePlan={handleApproveImagePlan}
           />
         </div>
 

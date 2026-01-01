@@ -13,6 +13,8 @@ interface ChatPaneProps {
   onEditImage?: (imageUrl: string) => void;
   onNavigateToStyle?: () => void;
   onStyleChange?: () => void;
+  isImagePlanning?: boolean;
+  onApproveImagePlan?: () => void;
 }
 
 export const ChatPane = ({
@@ -26,6 +28,8 @@ export const ChatPane = ({
   onEditImage,
   onNavigateToStyle,
   onStyleChange,
+  isImagePlanning,
+  onApproveImagePlan,
 }: ChatPaneProps) => {
   return (
     <div className="flex flex-col h-full bg-card border-r border-border">
@@ -34,6 +38,8 @@ export const ChatPane = ({
         isLoading={isLoading}
         onSelectImage={onSelectImage}
         onEditImage={onEditImage}
+        isImagePlanning={isImagePlanning}
+        onApproveImagePlan={onApproveImagePlan}
       />
       <ChatInput
         onSend={onSendMessage}

@@ -4,6 +4,7 @@ import { Check, RefreshCw, Pencil } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import { cn } from '../../lib/utils';
+import { StyleDropdown } from '../preview/StyleDropdown';
 import type { ImagePlacement, AspectRatio } from '../../types/imageGeneration';
 
 interface ImageSelectionGridProps {
@@ -189,17 +190,26 @@ const PlacementGroup = ({
 
   return (
     <div className={cn('pb-6', !isLast && 'border-b border-border mb-6')}>
-      {/* Header row */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <span className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-            {placementLabel}
-          </span>
-          <span className="text-sm text-muted-foreground/70 italic truncate">
-            &quot;{placement.description}&quot;
-          </span>
-        </div>
-        <div className="flex items-center gap-4 flex-shrink-0">
+      {/* Placement label */}
+      <div className="mb-2">
+        <span className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+          {placementLabel}
+        </span>
+      </div>
+
+      {/* Prompt + controls row */}
+      <div className="flex items-start justify-between gap-4 mb-4">
+        {/* Prompt - wraps to 2 lines */}
+        <p className="text-sm text-muted-foreground/80 italic line-clamp-2 flex-1 min-w-0">
+          &quot;{placement.description}&quot;
+        </p>
+
+        {/* Controls */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <StyleDropdown
+            onNavigateToSettings={() => {}}
+            onStyleChange={() => {}}
+          />
           <Button
             variant="outline"
             size="sm"

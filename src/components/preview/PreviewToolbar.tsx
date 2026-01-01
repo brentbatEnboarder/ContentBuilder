@@ -25,6 +25,11 @@ export const PreviewToolbar = ({
   onNavigateToVoice,
   onRegenerate,
 }: PreviewToolbarProps) => {
+  // Calculate word count (split on whitespace, filter empty strings)
+  const wordCount = content.trim()
+    ? content.trim().split(/\s+/).filter(Boolean).length
+    : 0;
+
   const handleCopy = () => {
     navigator.clipboard.writeText(content);
     toast.success('Copied to clipboard!');
@@ -36,8 +41,13 @@ export const PreviewToolbar = ({
 
   return (
     <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <VoiceDropdown onNavigateToSettings={onNavigateToVoice} />
+        {hasContent && (
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {wordCount.toLocaleString()} {wordCount === 1 ? 'word' : 'words'}
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-1">

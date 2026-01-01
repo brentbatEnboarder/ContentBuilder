@@ -1,3 +1,5 @@
+import type { ContentBlock } from './content';
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -20,6 +22,8 @@ export interface FileAttachment {
 export interface PageContent {
   text: string;
   images: string[];
+  /** Full content blocks with placement info (preferred over flat images array) */
+  contentBlocks?: ContentBlock[];
 }
 
 export interface Page {

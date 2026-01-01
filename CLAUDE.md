@@ -112,6 +112,12 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 26. **SSE Image Streaming** - Images appear one-by-one as they complete via Server-Sent Events
 27. **Claude API Logging** - Full system prompts and messages logged to backend console for debugging
 28. **Compact Chat Input** - Style dropdown + Generate Imagery above input; +/mic/send buttons embedded in input box
+29. **Word Count Display** - Preview toolbar shows word count next to brand voice dropdown
+30. **Content Block Persistence** - Full ContentBlock[] with placement info saved to database, header images restore correctly
+31. **Image Planning Approval Button** - "Generate Images" button appears after AI recommendations (alternative to typing "go ahead")
+32. **Improved Image Planning Format** - AI recommendations use numbered lists with bold headers for better readability
+33. **Image Modal Style Dropdown** - Each placement group has its own style dropdown next to "Regenerate All"
+34. **Stricter Image Tool Triggers** - Claude only invokes generate_image when user explicitly mentions image/picture/diagram/etc.
 
 ## Environment Variables
 
@@ -171,6 +177,8 @@ Defined in `server/src/services/claude.ts` as `imageGenerationTool`. The tool:
 - Uses the customer's configured image style by default
 - Generates a single image (vs. 3 variations for planned images)
 - Displays inline in the chat message with click-to-expand lightbox
+- **Only triggers when user explicitly mentions**: image, picture, photo, illustration, drawing, diagram, chart, graphic, visual
+- **Does NOT trigger for**: "create a page", "make content", "do a page on X" (these create text content)
 
 ### Inline Image Actions
 When hovering over generated images in chat, action buttons appear:
@@ -300,12 +308,13 @@ Compact layout with all controls in one area:
 
 ### Image Planning Flow
 When user clicks "Generate Imagery" button:
-1. AI analyzes content and recommends images (inline in chat)
+1. AI analyzes content and recommends images (inline in chat as numbered list)
 2. Recommendations include: title, description, placement (header/body), aspect ratio
-3. User can modify via conversation ("make the header more abstract", "add a diagram")
-4. When user says "go ahead" / "looks good" / etc., images generate
-5. Header images (21:9 ultrawide) appear above content in preview
-6. Body images use AI-recommended aspect ratio, appear below content, each with 3 variations stacked
+3. A purple "Generate Images" button appears below recommendations
+4. User can modify via conversation ("make the header more abstract", "add a diagram")
+5. User clicks "Generate Images" button OR types "go ahead" / "looks good" / etc.
+6. Header images (21:9 ultrawide) appear above content in preview
+7. Body images use AI-recommended aspect ratio, appear below content, each with 3 variations stacked
 
 ```tsx
 // useImagePlanning hook

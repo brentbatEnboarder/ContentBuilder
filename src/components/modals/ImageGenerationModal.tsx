@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Copy, Check, Sparkles } from 'lucide-react';
+import { X, Sparkles } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,7 +16,7 @@ import type { GenerationProgress } from '../../types/imageGeneration';
 interface ImageGenerationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  prompt: string;
+  prompt?: string; // No longer displayed but kept for backwards compatibility
   progress: GenerationProgress;
   isLoading: boolean;
   isGeneratingMore?: boolean; // Background generation in progress after first batch
@@ -224,7 +224,7 @@ const RobotPainterAnimation = () => {
 export const ImageGenerationModal = ({
   isOpen,
   onClose,
-  prompt,
+  prompt: _prompt, // No longer displayed
   progress,
   isLoading,
   isGeneratingMore = false,
@@ -232,7 +232,6 @@ export const ImageGenerationModal = ({
   children,
 }: ImageGenerationModalProps) => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   const handleClose = () => {
     if (isLoading || isGeneratingMore || hasGeneratedImages) {
@@ -245,12 +244,6 @@ export const ImageGenerationModal = ({
   const handleConfirmClose = () => {
     setShowConfirmDialog(false);
     onClose();
-  };
-
-  const copyPrompt = async () => {
-    await navigator.clipboard.writeText(prompt);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -289,27 +282,6 @@ export const ImageGenerationModal = ({
                 >
                   <X className="w-5 h-5 text-muted-foreground" />
                 </button>
-
-                {/* Prompt display section */}
-                <div className="mb-8">
-                  <p className="text-sm font-medium text-muted-foreground mb-2">
-                    Generating from prompt:
-                  </p>
-                  <div className="flex items-start gap-2 p-4 bg-primary/10 border border-primary/20 rounded-lg">
-                    <p className="flex-1 text-sm text-foreground line-clamp-3">{prompt}</p>
-                    <button
-                      onClick={copyPrompt}
-                      className="flex-shrink-0 p-1.5 hover:bg-primary/20 rounded transition-colors"
-                      title="Copy prompt"
-                    >
-                      {copied ? (
-                        <Check className="w-4 h-4 text-green-600" />
-                      ) : (
-                        <Copy className="w-4 h-4 text-primary" />
-                      )}
-                    </button>
-                  </div>
-                </div>
 
                 {/* Loading animation or content */}
                 {isLoading ? (

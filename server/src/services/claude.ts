@@ -575,9 +575,15 @@ You MUST respond with a JSON block inside <image-plan> tags, followed by a conve
 ]
 </image-plan>
 
-After the JSON, write a friendly message summarizing your recommendations and asking if the user wants to make changes or proceed.
+After the JSON, write a friendly message summarizing your recommendations. Use a **numbered list** to present each image recommendation clearly. End by asking if the user wants to make changes or proceed.
 
-Example message: "I recommend 2 images for your content: a header showing [X] and a supporting image illustrating [Y]. Would you like to adjust any of these, or shall I go ahead and generate them?"`;
+Example format:
+"I recommend the following images for your content:
+
+1. **Header: [Title]** - [Brief description of what it will show]
+2. **Body: [Title]** - [Brief description of what it will show]
+
+Would you like to adjust any of these, or shall I go ahead and generate them?"`;
 
   const messages: Anthropic.MessageParam[] = [];
 
@@ -677,7 +683,15 @@ ${request.content.slice(0, 2000)}
 ## Response Format
 Always respond with:
 1. <image-plan>[JSON array of recommendations]</image-plan>
-2. A conversational message
+2. A conversational message using a **numbered list** for image recommendations
+
+When presenting updated recommendations, use this format:
+"Here's the updated plan:
+
+1. **Header: [Title]** - [Brief description]
+2. **Body: [Title]** - [Brief description]
+
+[Follow-up question or confirmation]"
 
 If approving generation, your message should confirm you're starting generation.`;
 
@@ -762,18 +776,34 @@ export class ClaudeError extends Error {
  */
 export const imageGenerationTool: Anthropic.Tool = {
   name: 'generate_image',
-  description: `Generate an image based on a text description. Use this tool when the user asks you to create, generate, or make an image. The image will be generated using AI and displayed to the user.
+  description: `Generate an image based on a text description using AI.
 
-Examples of when to use this tool:
-- "Generate an image of a dog playing fetch"
-- "Create a picture of a sunset over mountains"
-- "Make me an illustration of a team meeting"
-- "Can you draw a robot?"
+CRITICAL: ONLY use this tool when the user EXPLICITLY requests a visual output. The user must use words that clearly indicate they want an IMAGE, not text content.
 
-Do NOT use this tool when:
-- The user is just discussing images conceptually
-- The user is asking about existing images
-- The user wants to plan images for content (use the image planning flow instead)`,
+REQUIRED TRIGGER WORDS (user must mention one of these):
+- "image" / "picture" / "photo" / "photograph"
+- "illustration" / "drawing" / "sketch"
+- "diagram" / "chart" / "infographic" / "visual"
+- "graphic" / "artwork" / "banner" / "icon"
+- Explicitly: "draw", "illustrate", "visualize"
+
+Examples of when to USE this tool:
+- "Generate an image of a dog" (explicitly says "image")
+- "Create a picture of mountains" (explicitly says "picture")
+- "Draw me a team meeting" (explicitly says "draw")
+- "Can you make an illustration?" (explicitly says "illustration")
+- "I need a diagram showing our process" (explicitly says "diagram")
+
+DO NOT use this tool when:
+- User asks to "create a page" (page = text content, not an image)
+- User asks to "make content" (content = text, not an image)
+- User asks to "write about" something (write = text)
+- User asks to "do" something without mentioning visuals
+- User discusses images conceptually but doesn't request one
+- User wants to plan multiple images (use image planning flow instead)
+- The word "image/picture/illustration/diagram" is NOT explicitly in the request
+
+When in doubt, DO NOT use this tool. Generate text content instead.`,
   input_schema: {
     type: 'object' as const,
     properties: {
@@ -864,7 +894,17 @@ export async function* generateContentStreamWithTools(
   const enhancedSystemPrompt = `${systemPrompt}
 
 ## Image Generation Capability
-You have access to an image generation tool. When the user asks you to generate, create, or make an image, use the generate_image tool. After the image is generated, briefly acknowledge it was created.
+You have access to an image generation tool, but ONLY use it when the user EXPLICITLY asks for a visual output.
+
+The user must use words like: "image", "picture", "photo", "illustration", "drawing", "diagram", "chart", "graphic", "visual", or verbs like "draw", "illustrate".
+
+DO NOT use the image tool for requests like:
+- "Create a page about X" (this is text content)
+- "Make content for Y" (this is text content)
+- "Do a page on Z" (this is text content)
+- Any request that doesn't explicitly mention wanting an image/picture/illustration/diagram
+
+When in doubt, create TEXT content. Only generate images when the user clearly asks for one.
 
 Default image style: ${defaultStyleId}`;
 

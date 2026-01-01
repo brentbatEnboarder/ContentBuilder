@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Page, ChatMessage } from '@/types/page';
+import type { ContentBlock } from '@/types/content';
 import { usePages } from './usePages';
 import { apiClient } from '@/services/api';
 
@@ -9,6 +10,7 @@ interface PageEditorState {
   generatedContent: {
     text: string;
     images: string[];
+    contentBlocks?: ContentBlock[];
   };
   isGenerating: boolean;
 }
@@ -51,18 +53,23 @@ export const usePageEditor = (pageId: string | null) => {
 
     // Reset loading flag if pageId changed (navigated to different page)
     if (pageId !== loadedPageIdRef.current) {
+      const oldPageId = loadedPageIdRef.current;
       console.log('[usePageEditor] Page ID changed, resetting hasLoaded', {
-        from: loadedPageIdRef.current,
+        from: oldPageId,
         to: pageId,
       });
       hasLoadedRef.current = false;
-      loadedPageIdRef.current = pageId;
+
       // Reset the saved flag when navigating to a truly different page
       // But NOT if we're going from null to a real ID (that's a save)
-      if (loadedPageIdRef.current !== null && pageId !== null) {
+      // Use oldPageId before updating loadedPageIdRef
+      if (!(oldPageId === null && pageId !== null)) {
+        // Reset for: existing->new, existing->existing, new->new (shouldn't happen)
         hasSavedPageRef.current = false;
         justSavedRef.current = false;
       }
+
+      loadedPageIdRef.current = pageId;
     }
 
     console.log('[usePageEditor] Load effect continuing', {
@@ -85,12 +92,13 @@ export const usePageEditor = (pageId: string | null) => {
           console.log('[usePageEditor] LOADING PAGE FROM DB (first load)', {
             pageId: existingPage.id,
             contentLength: existingPage.content?.text?.length || 0,
+            blockCount: existingPage.content?.contentBlocks?.length || 0,
           });
           hasLoadedRef.current = true;
           setState({
             page: existingPage,
             isDirty: false,
-            generatedContent: existingPage.content || { text: '', images: [] },
+            generatedContent: existingPage.content || { text: '', images: [], contentBlocks: [] },
             isGenerating: false,
           });
         } else {
@@ -135,10 +143,11 @@ export const usePageEditor = (pageId: string | null) => {
     }));
   }, []);
 
-  const updateGeneratedContent = useCallback((content: { text: string; images: string[] }) => {
+  const updateGeneratedContent = useCallback((content: { text: string; images: string[]; contentBlocks?: ContentBlock[] }) => {
     console.log('[usePageEditor] updateGeneratedContent called', {
       textLength: content.text.length,
       imageCount: content.images.length,
+      blockCount: content.contentBlocks?.length || 0,
       textPreview: content.text.substring(0, 100),
     });
     setState(prev => ({

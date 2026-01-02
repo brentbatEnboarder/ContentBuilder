@@ -93,7 +93,8 @@ server/tmp
 # Lovable reference (don't track changes)
 loveable-ai-content-generator/
 
-# Public assets (temporary/generated)
-public/
-!public/styles/
+# Public assets - track important files
+!public/
+public/*.tmp
+public/*.temp
 Archive/

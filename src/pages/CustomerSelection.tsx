@@ -1,9 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Building2, Loader2, LogOut } from 'lucide-react';
+import { Plus, Building2, Loader2, LogOut, Trash2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useCustomer, Customer } from '@/contexts/CustomerContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -12,11 +22,21 @@ import { toast } from 'sonner';
 export function CustomerSelection() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { customers, loading, error, selectCustomer, createCustomer } = useCustomer();
+  const { customers, loading, error, selectCustomer, createCustomer, deleteCustomer } = useCustomer();
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
   const [customerLogos, setCustomerLogos] = useState<Record<string, string | null>>({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Filter customers by search query
+  const filteredCustomers = useMemo(() => {
+    if (!searchQuery.trim()) return customers;
+    const query = searchQuery.toLowerCase();
+    return customers.filter((c) => c.name.toLowerCase().includes(query));
+  }, [customers, searchQuery]);
 
   // Fetch logos for all customers from customer_settings
   useEffect(() => {
@@ -72,6 +92,21 @@ export function CustomerSelection() {
     navigate('/login');
   };
 
+  const handleDelete = async () => {
+    if (!customerToDelete) return;
+
+    setDeleting(true);
+    const success = await deleteCustomer(customerToDelete.id);
+    setDeleting(false);
+    setCustomerToDelete(null);
+
+    if (success) {
+      toast.success(`Deleted "${customerToDelete.name}"`);
+    } else {
+      toast.error('Failed to delete customer');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -121,38 +156,69 @@ export function CustomerSelection() {
             </div>
           )}
 
+          {/* Search Bar */}
+          {customers.length > 3 && (
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search customers..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          )}
+
           {/* Customer List */}
           {customers.length > 0 ? (
             <div className="grid gap-3 mb-6">
-              {customers.map((customer) => (
-                <Card
-                  key={customer.id}
-                  className="p-4 cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-colors"
-                  onClick={() => handleSelect(customer)}
-                >
-                  <div className="flex items-center gap-4">
-                    {customerLogos[customer.id] ? (
-                      <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
-                        <img
-                          src={customerLogos[customer.id]!}
-                          alt={`${customer.name} logo`}
-                          className="h-full w-full object-contain"
-                        />
+              {filteredCustomers.length > 0 ? (
+                filteredCustomers.map((customer) => (
+                  <Card
+                    key={customer.id}
+                    className="p-4 cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-colors group"
+                    onClick={() => handleSelect(customer)}
+                  >
+                    <div className="flex items-center gap-4">
+                      {customerLogos[customer.id] ? (
+                        <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                          <img
+                            src={customerLogos[customer.id]!}
+                            alt={`${customer.name} logo`}
+                            className="h-full w-full object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Building2 className="h-6 w-6 text-primary" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground truncate">{customer.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Created {new Date(customer.created_at).toLocaleDateString()}
+                        </p>
                       </div>
-                    ) : (
-                      <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Building2 className="h-6 w-6 text-primary" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">{customer.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Created {new Date(customer.created_at).toLocaleDateString()}
-                      </p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCustomerToDelete(customer);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                ))
+              ) : (
+                <div className="p-8 text-center border border-dashed border-border rounded-lg">
+                  <Search className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                  <p className="text-muted-foreground">No customers match "{searchQuery}"</p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="mb-6 p-8 text-center border border-dashed border-border rounded-lg">
@@ -204,6 +270,33 @@ export function CustomerSelection() {
           To switch customers, sign out and sign back in.
         </p>
       </footer>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!customerToDelete} onOpenChange={(open) => !open && setCustomerToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{customerToDelete?.name}</strong>?
+              <br />
+              <br />
+              This will permanently delete all associated data including pages, brand settings, and content.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

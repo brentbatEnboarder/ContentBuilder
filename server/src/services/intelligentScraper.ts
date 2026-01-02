@@ -1,4 +1,4 @@
-import FirecrawlApp from '@mendable/firecrawl-js';
+import Firecrawl from '@mendable/firecrawl-js';
 import Anthropic from '@anthropic-ai/sdk';
 import { Vibrant } from 'node-vibrant/node';
 
@@ -47,21 +47,22 @@ interface ScrapedPage {
   url: string;
   title: string;
   content: string;
+  logo?: string | null; // Logo or og:image from metadata
 }
 
 // ============================================================================
 // Clients (lazy initialization)
 // ============================================================================
 
-let firecrawlClient: FirecrawlApp | null = null;
+let firecrawlClient: Firecrawl | null = null;
 let anthropicClient: Anthropic | null = null;
 
-function getFirecrawlClient(): FirecrawlApp {
+function getFirecrawlClient(): Firecrawl {
   if (!process.env.FIRECRAWL_API_KEY) {
     throw new Error('FIRECRAWL_API_KEY not configured');
   }
   if (!firecrawlClient) {
-    firecrawlClient = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY });
+    firecrawlClient = new Firecrawl({ apiKey: process.env.FIRECRAWL_API_KEY });
   }
   return firecrawlClient;
 }
@@ -129,7 +130,7 @@ function normalizeUrl(url: string): string {
 
 export async function* intelligentScrape(
   url: string,
-  maxPages: number = 10,
+  maxPages: number = 20,
   scanMore: boolean = false
 ): AsyncGenerator<ScrapeProgress, ExtractedCompanyInfo, undefined> {
   const normalizedUrl = normalizeUrl(url);
@@ -149,9 +150,53 @@ export async function* intelligentScrape(
   const claude = getAnthropicClient();
   const scrapedPages: ScrapedPage[] = [];
   let allLinks: string[] = [];
+  let homepageLogo: string | null = null;
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Phase 1: Scrape the homepage
+  // Phase 1: Map the entire site to discover ALL URLs (including from sitemap)
+  // ─────────────────────────────────────────────────────────────────────────
+  yield { type: 'status', message: 'Mapping website structure...', pagesScraped: 0, totalPages: maxPages };
+
+  try {
+    // Use map() to discover all URLs - this checks sitemap.xml and crawls for links
+    const mapResult = await firecrawl.map(normalizedUrl, {
+      limit: 200, // Get up to 200 URLs for Claude to choose from
+      includeSubdomains: false,
+    });
+
+    // Extract URLs from map result
+    if (mapResult.links && Array.isArray(mapResult.links)) {
+      allLinks = mapResult.links
+        .map((link: string | { url: string }) => typeof link === 'string' ? link : link.url)
+        .filter((link: string) => {
+          try {
+            const linkUrl = new URL(link, baseUrl);
+            // Only keep internal links
+            return linkUrl.origin === baseUrl;
+          } catch {
+            return false;
+          }
+        });
+
+      console.log(`[Scraper] Map discovered ${allLinks.length} URLs on the site`);
+
+      // Log any careers-related URLs found
+      const careerUrls = allLinks.filter((url: string) => {
+        const lower = url.toLowerCase();
+        return lower.includes('career') || lower.includes('job') || lower.includes('work-with') ||
+               lower.includes('join-us') || lower.includes('hiring') || lower.includes('opportunities');
+      });
+      if (careerUrls.length > 0) {
+        console.log(`[Scraper] Found ${careerUrls.length} career-related URLs:`, careerUrls);
+      }
+    }
+  } catch (error) {
+    console.warn(`[Scraper] Map failed, falling back to homepage links:`, error);
+    // Continue - we'll get links from homepage scrape as fallback
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Phase 2: Scrape the homepage for content and logo
   // ─────────────────────────────────────────────────────────────────────────
   yield { type: 'status', message: 'Scanning homepage...', pagesScraped: 0, totalPages: maxPages };
 
@@ -163,29 +208,49 @@ export async function* intelligentScrape(
     const homepageContent = homepageDoc.markdown || '';
     const homepageTitle = homepageDoc.metadata?.title || 'Homepage';
 
-    // Extract all links from the page
-    allLinks = (homepageDoc.links || [])
-      .filter((link: string) => {
-        try {
-          const linkUrl = new URL(link, baseUrl);
-          // Only keep internal links
-          return linkUrl.origin === baseUrl;
-        } catch {
-          return false;
-        }
-      })
-      .map((link: string) => {
-        try {
-          return new URL(link, baseUrl).href;
-        } catch {
-          return link;
-        }
-      });
+    // Extract logo from metadata (og:image, favicon, or logo)
+    const metadata = homepageDoc.metadata as {
+      ogImage?: string;
+      favicon?: string;
+      logo?: string;
+      title?: string;
+    } | undefined;
+
+    homepageLogo = metadata?.ogImage || metadata?.logo || null;
+
+    // Log what we found for debugging
+    if (homepageLogo) {
+      console.log(`[Scraper] Found logo/ogImage from homepage: ${homepageLogo}`);
+    } else if (metadata?.favicon) {
+      console.log(`[Scraper] Found favicon (backup): ${metadata.favicon}`);
+    }
+
+    // If map failed, use homepage links as fallback
+    if (allLinks.length === 0 && homepageDoc.links) {
+      console.log(`[Scraper] Using homepage links as fallback`);
+      allLinks = (homepageDoc.links || [])
+        .filter((link: string) => {
+          try {
+            const linkUrl = new URL(link, baseUrl);
+            return linkUrl.origin === baseUrl;
+          } catch {
+            return false;
+          }
+        })
+        .map((link: string) => {
+          try {
+            return new URL(link, baseUrl).href;
+          } catch {
+            return link;
+          }
+        });
+    }
 
     scrapedPages.push({
       url: normalizedUrl,
       title: homepageTitle,
       content: homepageContent,
+      logo: homepageLogo,
     });
 
     yield {
@@ -203,7 +268,7 @@ export async function* intelligentScrape(
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Phase 2: Ask Claude to identify best pages to scrape
+  // Phase 3: Ask Claude to identify best pages to scrape from mapped URLs
   // ─────────────────────────────────────────────────────────────────────────
   yield { type: 'analyzing', message: 'Analyzing site structure...' };
 
@@ -222,7 +287,7 @@ export async function* intelligentScrape(
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Phase 3: Scrape the identified pages
+  // Phase 4: Scrape the identified pages
   // ─────────────────────────────────────────────────────────────────────────
   const scrapedUrls = new Set([normalizedUrl]);
 
@@ -271,7 +336,7 @@ export async function* intelligentScrape(
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Phase 4: Extract company information with Claude
+  // Phase 5: Extract company information with Claude
   // ─────────────────────────────────────────────────────────────────────────
   yield { type: 'extracting', message: 'Extracting company information...' };
 
@@ -281,8 +346,14 @@ export async function* intelligentScrape(
 
   const extractedInfo = await extractCompanyInfo(claude, allContent, normalizedUrl);
 
+  // Use homepage logo/ogImage as fallback if Claude didn't find one
+  const finalLogo = extractedInfo.logo || homepageLogo;
+  if (finalLogo && !extractedInfo.logo) {
+    console.log(`[Scraper] Using homepage og:image as logo fallback: ${finalLogo}`);
+  }
+
   // Try to extract colors from any logo or OG image found
-  const colors = await tryExtractColors(scrapedPages, extractedInfo.logo);
+  const colors = await tryExtractColors(scrapedPages, finalLogo);
 
   // Calculate remaining links for "scan more"
   const remainingLinks = pagesToScrape
@@ -299,7 +370,7 @@ export async function* intelligentScrape(
     name: extractedInfo.name,
     industry: extractedInfo.industry,
     description: extractedInfo.description,
-    logo: extractedInfo.logo,
+    logo: finalLogo,
     colors: {
       primary: primaryColor,
       secondary: secondaryColor,
@@ -353,7 +424,7 @@ async function identifyPagesToScrape(
     })
     .slice(0, 100); // Limit to 100 links for Claude
 
-  const prompt = `You are analyzing a company website to gather information for employee onboarding content generation.
+  const prompt = `You are analyzing a company website to gather comprehensive information for employee onboarding content generation.
 
 Here is the homepage content:
 <homepage>
@@ -366,26 +437,46 @@ ${uniqueLinks.join('\n')}
 </links>
 
 Your task: Select up to ${maxPages} pages that would be MOST valuable for understanding:
-1. Company culture and values
-2. Mission and vision
-3. Team and leadership
-4. About the company/history
-5. Careers and what it's like to work there
-6. Products/services (brief overview)
+
+**HIGHEST PRIORITY (priority 9-10) - ALWAYS include if available:**
+- Careers pages (often /careers, /jobs, /work-with-us, /join-us, /opportunities, /join-our-team)
+- About Us pages (often /about, /about-us, /our-story, /who-we-are, /company)
+- Team/People pages (often /team, /people, /our-team, /leadership, /our-people, /meet-the-team)
+- Culture pages (often /culture, /life-at, /working-here, /our-culture, /benefits)
+- Values pages (often /values, /our-values, /mission, /what-we-stand-for)
+
+**HIGH PRIORITY (priority 7-8):**
+- Mission/Vision pages
+- History/Story pages (often /history, /our-history, /our-journey)
+- Why work here pages
+- Employee benefits/perks pages
+- Diversity & Inclusion pages
+
+**MEDIUM PRIORITY (priority 5-6):**
+- Products/Services overview (main page, not individual products)
+- Customers/Industries served (overview only)
 
 AVOID pages like:
-- Blog posts, news, press releases
-- Case studies and testimonials
-- Legal pages (privacy, terms)
+- Blog posts, news articles, press releases (except "press room" landing pages)
+- Individual case studies and testimonials
+- Legal pages (privacy, terms, cookies)
 - Support/help documentation
 - Individual product detail pages
+- Login/signup pages
+- Shopping cart or e-commerce pages
+- Social media links
+
+IMPORTANT: Look for variations of career-related URLs - companies use many different naming conventions:
+- /careers, /career, /jobs, /job, /work-with-us, /join-us, /join, /opportunities
+- /work-here, /employment, /openings, /positions, /vacancies, /hiring
+- /life-at-[company], /working-at-[company]
 
 Return a JSON array of objects with:
 - "url": the full URL
-- "reason": short description (e.g., "About Us page", "Careers page")
+- "reason": short description (e.g., "About Us page", "Careers & Culture page")
 - "priority": 1-10 (10 = highest priority)
 
-Sort by priority descending. Only include pages you're confident are relevant.
+Sort by priority descending. Include as many relevant pages as possible up to the limit.
 
 Return ONLY the JSON array, no other text.`;
 
@@ -436,7 +527,7 @@ async function extractCompanyInfo(
   allContent: string,
   url: string
 ): Promise<ClaudeExtraction> {
-  const prompt = `You are extracting company information from website content for an employee onboarding content generation tool.
+  const prompt = `You are extracting comprehensive company information from website content for an employee onboarding content generation tool. This information will be used to create personalized onboarding content, so be thorough.
 
 <website_content>
 ${allContent.slice(0, 80000)}
@@ -445,20 +536,58 @@ ${allContent.slice(0, 80000)}
 Extract the following information and return as JSON:
 
 1. "name": The official company name (not taglines)
-2. "industry": The industry/sector they operate in
-3. "description": A comprehensive description including:
-   - What the company does
-   - Their mission and values
-   - Company culture
-   - Products/services overview
-   - Team/leadership info if available
-   - What makes them unique
-   - Any career/workplace culture info
 
-   This should be detailed (can be 500-2000 words). Include specific details, not generic statements.
-   Format as flowing paragraphs, not bullet points.
+2. "industry": The industry/sector they operate in (be specific, e.g., "HR Technology / Employee Experience Software" not just "Technology")
+
+3. "description": A COMPREHENSIVE description that will help generate excellent onboarding content. This should be 800-2500 words and cover:
+
+   **Company Overview:**
+   - What the company does and who they serve
+   - Their products or services and how they work
+   - Their market position and what makes them unique
+   - Company size, locations, or global presence if mentioned
+
+   **Mission, Vision & Values:**
+   - Their stated mission or purpose
+   - Core values and what they mean in practice
+   - Any guiding principles or beliefs
+
+   **Culture & Workplace:**
+   - Company culture characteristics
+   - What it's like to work there
+   - Team dynamics and collaboration style
+   - Work environment (remote, hybrid, in-office)
+   - Employee benefits, perks, or programs mentioned
+   - Diversity, equity, and inclusion initiatives
+
+   **People & Leadership:**
+   - Leadership team and their backgrounds
+   - Founder story if available
+   - Team composition or structure
+   - Notable people or roles mentioned
+
+   **Career & Growth:**
+   - Career development opportunities
+   - Learning and development programs
+   - Why people join or stay at the company
+   - Employee testimonials or quotes if available
+
+   **History & Achievements:**
+   - Company founding story
+   - Key milestones or growth
+   - Awards, recognition, or achievements
+   - Future direction or goals
+
+   Format the description using **markdown**:
+   - Use ## headings to separate major sections (Company Overview, Culture, Career, etc.)
+   - Use **bold** for emphasis on key terms, values, and programs
+   - Use bullet points for lists of values, benefits, or features
+   - Use > blockquotes for employee testimonials or mission statements
+   - Include specific details: names, numbers, quotes, and concrete examples
+   - Avoid generic statements like "they care about their employees" - quote specific programs instead
 
 4. "logo": If you find a logo URL in the content, include it. Otherwise null.
+
 5. "suggestedColors": An object with brand colors (all as hex codes, or null if not found):
    - "primary": The main brand color (often used in logo, headers, CTAs)
    - "secondary": Supporting brand color (often used for backgrounds, sections)
@@ -467,18 +596,14 @@ Extract the following information and return as JSON:
    - "buttonBg": Button background color (often same as primary, or a variation)
    - "buttonFg": Button text/foreground color (usually white #FFFFFF or dark for contrast)
 
-   Look for:
-   - Explicit brand guidelines or color mentions
-   - CSS color values in the content
-   - Common patterns (e.g., if primary is dark, buttonFg is likely white)
-   - If you can't find a color, suggest an appropriate one based on the primary color and good design principles
+   Look for explicit brand guidelines, CSS color values, or infer from the overall design.
 
 Return ONLY valid JSON, no other text.`;
 
   try {
     const response = await claude.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
+      max_tokens: 8000, // Increased for comprehensive descriptions (800-2500 words)
       messages: [{ role: 'user', content: prompt }],
     });
 
@@ -591,7 +716,7 @@ async function tryExtractColors(
 
 export async function* scanMorePages(
   url: string,
-  maxPages: number = 10
+  maxPages: number = 20
 ): AsyncGenerator<ScrapeProgress, ExtractedCompanyInfo, undefined> {
   const cached = getCached(url);
   if (!cached) {

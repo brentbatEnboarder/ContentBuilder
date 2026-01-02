@@ -142,6 +142,13 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 53. **Login Image WebP Optimization** - 1.2MB PNG → 73KB WebP (94% reduction) with `<picture>` fallback
 54. **SSE Buffer Fix** - Process remaining buffer after stream ends (fixes missing 3rd image)
 55. **Dropdown Immediate Feedback** - StyleDropdown uses local state for instant UI updates
+56. **Enhanced Scraper** - Uses Firecrawl v2 map() for URL discovery, 20 pages, prioritizes careers/team pages
+57. **Logo Detection** - Extracts og:image from homepage metadata as logo fallback
+58. **Customer Search** - Search bar on customer selection page (appears with 4+ customers)
+59. **Customer Delete** - Delete customers with confirmation dialog (cascades to settings/pages)
+60. **Markdown Descriptions** - Company description renders markdown, with Edit button for changes
+61. **Logo Editor** - Click logo to upload file or enter URL, with preview and remove options
+62. **Inactive Profile State** - Company Profile card greyed out until scan completes
 
 ## Environment Variables
 
@@ -302,17 +309,22 @@ Here's your image!
 
 ### Intelligent Scraper
 The intelligent scraper (`/api/scrape/intelligent`) uses SSE streaming:
-1. Scrapes homepage, extracts internal links
-2. Claude identifies best pages (About, Culture, Careers, Values, etc.)
-3. Scrapes up to 10 relevant pages
-4. Claude extracts company info + 6 brand colors
+1. Uses Firecrawl `map()` to discover ALL URLs on the site (up to 200, including from sitemap)
+2. Claude identifies best pages prioritizing: Careers, About Us, Team/People, Culture, Values
+3. Scrapes up to 20 relevant pages
+4. Claude extracts comprehensive company info (800-2500 words, markdown formatted) + 6 brand colors
 5. Real-time progress shown in UI with "Scan More" option
+
+The page identification prompt emphasizes career-related pages with many URL variations:
+- `/careers`, `/jobs`, `/work-with-us`, `/join-us`, `/opportunities`, `/join-our-team`
+- `/work-here`, `/employment`, `/openings`, `/positions`, `/vacancies`, `/hiring`
+- `/life-at-[company]`, `/working-at-[company]`
 
 ```tsx
 await apiClient.scrapeIntelligent(
   url,
   (progress) => { /* onProgress - updates UI */ },
-  { maxPages: 10, scanMore: false }
+  { maxPages: 20, scanMore: false }
 );
 ```
 

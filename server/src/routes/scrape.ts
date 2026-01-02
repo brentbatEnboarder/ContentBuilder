@@ -278,7 +278,7 @@ router.post('/intelligent', async (req: Request, res: Response): Promise<void> =
   }
 
   // Validate input
-  const { url, maxPages = 10, scanMore = false } = req.body;
+  const { url, maxPages = 20, scanMore = false } = req.body;
 
   const validation = validateUrl(url);
   if (!validation.valid) {

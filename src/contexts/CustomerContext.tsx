@@ -18,6 +18,7 @@ interface CustomerContextType {
   selectCustomer: (customer: Customer) => void;
   clearCustomer: () => void;
   createCustomer: (name: string) => Promise<Customer | null>;
+  deleteCustomer: (customerId: string) => Promise<boolean>;
   refreshCustomers: () => Promise<void>;
 }
 
@@ -149,6 +150,55 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
     }
   }, [user, refreshCustomers]);
 
+  // Delete a customer and all associated data
+  const deleteCustomer = useCallback(async (customerId: string): Promise<boolean> => {
+    if (!user) {
+      setError('You must be logged in to delete a customer');
+      return false;
+    }
+
+    setError(null);
+
+    try {
+      // Delete customer_settings first (foreign key)
+      await supabase
+        .from('customer_settings')
+        .delete()
+        .eq('customer_id', customerId);
+
+      // Delete pages (foreign key)
+      await supabase
+        .from('pages')
+        .delete()
+        .eq('customer_id', customerId);
+
+      // Delete the customer
+      const { error: deleteError } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', customerId);
+
+      if (deleteError) {
+        console.error('Error deleting customer:', deleteError);
+        setError(deleteError.message);
+        return false;
+      }
+
+      // Clear current customer if it was deleted
+      if (currentCustomer?.id === customerId) {
+        clearCustomer();
+      }
+
+      // Refresh the customer list
+      await refreshCustomers();
+      return true;
+    } catch (err) {
+      console.error('Unexpected error deleting customer:', err);
+      setError('Failed to delete customer');
+      return false;
+    }
+  }, [user, currentCustomer, clearCustomer, refreshCustomers]);
+
   return (
     <CustomerContext.Provider
       value={{
@@ -159,6 +209,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         selectCustomer,
         clearCustomer,
         createCustomer,
+        deleteCustomer,
         refreshCustomers,
       }}
     >

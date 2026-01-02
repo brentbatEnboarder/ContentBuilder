@@ -1,12 +1,22 @@
-import { useCallback } from 'react';
-import { Building2, Loader2, CheckCircle2, ExternalLink, Globe, Sparkles, FileText } from 'lucide-react';
+import { useCallback, useState, useRef } from 'react';
+import { Building2, Loader2, CheckCircle2, ExternalLink, Globe, Sparkles, FileText, Eye, Edit3, ImagePlus, X, Link2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useCustomer } from '@/contexts/CustomerContext';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
 
 export const CompanyInfoScreen = () => {
   const {
@@ -24,6 +34,16 @@ export const CompanyInfoScreen = () => {
     scanUrl,
     scanMore,
   } = useCompanySettings();
+
+  const [showLogoModal, setShowLogoModal] = useState(false);
+  const [logoUrl, setLogoUrl] = useState('');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { currentCustomer } = useCustomer();
+
+  // Profile is active if a scan has been completed OR if there's existing data
+  const hasScannedOrHasData = scannedPages.length > 0 || settings.name || settings.description;
 
   const handleSave = useCallback(async () => {
     try {
@@ -47,6 +67,89 @@ export const CompanyInfoScreen = () => {
     await scanUrl();
     if (scanError) {
       toast.error(scanError);
+    }
+  };
+
+  const handleLogoClick = () => {
+    setLogoUrl(settings.logo || '');
+    setShowLogoModal(true);
+  };
+
+  const handleLogoSave = () => {
+    updateDraft({ logo: logoUrl.trim() || null });
+    setShowLogoModal(false);
+    toast.success('Logo updated');
+  };
+
+  const handleLogoRemove = () => {
+    updateDraft({ logo: null });
+    setShowLogoModal(false);
+    toast.info('Logo removed');
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentCustomer) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image must be less than 2MB');
+      return;
+    }
+
+    setIsUploadingLogo(true);
+
+    try {
+      // Create unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentCustomer.id}/logo-${Date.now()}.${fileExt}`;
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('logos')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (uploadError) {
+        // If bucket doesn't exist, fall back to base64
+        if (uploadError.message.includes('not found') || uploadError.message.includes('Bucket')) {
+          // Convert to base64 as fallback
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64 = reader.result as string;
+            setLogoUrl(base64);
+            toast.success('Logo loaded (using local storage)');
+          };
+          reader.readAsDataURL(file);
+        } else {
+          throw uploadError;
+        }
+      } else {
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('logos')
+          .getPublicUrl(fileName);
+
+        setLogoUrl(publicUrl);
+        toast.success('Logo uploaded');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload logo');
+    } finally {
+      setIsUploadingLogo(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -183,31 +286,65 @@ export const CompanyInfoScreen = () => {
       )}
 
       {/* Company Profile Section */}
-      <div className="bg-card rounded-2xl border border-border shadow-md overflow-hidden">
+      <div className={`bg-card rounded-2xl border shadow-md overflow-hidden transition-all ${
+        hasScannedOrHasData
+          ? 'border-border'
+          : 'border-border/50 opacity-60'
+      }`}>
         {/* Card Header */}
-        <div className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-primary/5 to-primary/10 border-b border-border/50">
-          <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/15">
-            <Building2 className="w-4 h-4 text-primary" />
+        <div className={`flex items-center gap-2 px-5 py-3 border-b border-border/50 ${
+          hasScannedOrHasData
+            ? 'bg-gradient-to-r from-primary/5 to-primary/10'
+            : 'bg-muted/30'
+        }`}>
+          <div className={`flex items-center justify-center w-7 h-7 rounded-lg ${
+            hasScannedOrHasData ? 'bg-primary/15' : 'bg-muted'
+          }`}>
+            <Building2 className={`w-4 h-4 ${hasScannedOrHasData ? 'text-primary' : 'text-muted-foreground'}`} />
           </div>
           <span className="text-sm font-medium text-foreground">Company Profile</span>
+          {!hasScannedOrHasData && (
+            <span className="text-xs text-muted-foreground ml-auto">Scan a website to populate</span>
+          )}
         </div>
 
         {/* Card Body */}
-        <div className="p-6">
+        <div className={`p-6 ${!hasScannedOrHasData ? 'pointer-events-none' : ''}`}>
           <div className="flex gap-6">
-            {/* Logo placeholder */}
+            {/* Logo - clickable to edit */}
             <div className="flex-shrink-0">
-              <div className="group relative w-24 h-24 bg-gradient-to-br from-muted to-muted/50 rounded-xl border-2 border-dashed border-border hover:border-primary/50 transition-colors flex flex-col items-center justify-center cursor-pointer">
+              <div
+                onClick={hasScannedOrHasData ? handleLogoClick : undefined}
+                className={`group relative w-24 h-24 bg-gradient-to-br from-muted to-muted/50 rounded-xl border-2 border-dashed transition-colors flex flex-col items-center justify-center ${
+                  hasScannedOrHasData
+                    ? 'border-border hover:border-primary/50 cursor-pointer'
+                    : 'border-border/50 cursor-not-allowed'
+                }`}
+              >
                 {settings.logo ? (
-                  <img
-                    src={settings.logo}
-                    alt="Company logo"
-                    className="w-full h-full object-contain rounded-xl p-1"
-                  />
+                  <>
+                    <img
+                      src={settings.logo}
+                      alt="Company logo"
+                      className="w-full h-full object-contain rounded-xl p-1"
+                    />
+                    {/* Edit overlay on hover */}
+                    <div className="absolute inset-0 bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Edit3 className="w-5 h-5 text-white" />
+                    </div>
+                  </>
                 ) : (
                   <>
-                    <Building2 className="w-8 h-8 text-muted-foreground group-hover:text-primary/70 transition-colors" />
-                    <span className="text-[10px] text-muted-foreground mt-1 group-hover:text-primary/70 transition-colors">Logo</span>
+                    <ImagePlus className={`w-8 h-8 transition-colors ${
+                      hasScannedOrHasData
+                        ? 'text-muted-foreground group-hover:text-primary/70'
+                        : 'text-muted-foreground/50'
+                    }`} />
+                    <span className={`text-[10px] mt-1 transition-colors ${
+                      hasScannedOrHasData
+                        ? 'text-muted-foreground group-hover:text-primary/70'
+                        : 'text-muted-foreground/50'
+                    }`}>Add Logo</span>
                   </>
                 )}
               </div>
@@ -241,23 +378,165 @@ export const CompanyInfoScreen = () => {
 
           {/* Description */}
           <div className="mt-6 pt-6 border-t border-border/50">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-3">
               <FileText className="w-4 h-4 text-primary" />
-              <Label htmlFor="description" className="text-sm font-medium">Company Description</Label>
+              <Label className="text-sm font-medium">Company Description</Label>
+              <div className="ml-auto">
+                {isEditingDescription ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditingDescription(false)}
+                    className="h-7 px-3 text-xs"
+                  >
+                    <Eye className="w-3 h-3 mr-1.5" />
+                    Done Editing
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEditingDescription(true)}
+                    className="h-7 px-3 text-xs"
+                  >
+                    <Edit3 className="w-3 h-3 mr-1.5" />
+                    Edit
+                  </Button>
+                )}
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground mb-3">
-              This description will be used to generate personalized onboarding content.
-            </p>
-            <Textarea
-              id="description"
-              placeholder="Describe what your company does, its mission, values, culture, and what makes it unique..."
-              value={settings.description}
-              onChange={(e) => updateDraft({ description: e.target.value })}
-              className="min-h-[280px] resize-y text-sm leading-relaxed"
-            />
+
+            {isEditingDescription ? (
+              <Textarea
+                id="description"
+                placeholder="Describe what your company does, its mission, values, culture, and what makes it unique..."
+                value={settings.description}
+                onChange={(e) => updateDraft({ description: e.target.value })}
+                className="min-h-[350px] resize-y text-sm leading-relaxed font-mono"
+                autoFocus
+              />
+            ) : (
+              <div className="min-h-[200px] max-h-[500px] overflow-y-auto p-4 bg-muted/20 rounded-lg border border-border prose prose-sm dark:prose-invert max-w-none">
+                {settings.description ? (
+                  <ReactMarkdown>{settings.description}</ReactMarkdown>
+                ) : (
+                  <p className="text-muted-foreground italic">No description yet. Click Edit to add one.</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Logo Edit Modal */}
+      <Dialog open={showLogoModal} onOpenChange={setShowLogoModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ImagePlus className="w-5 h-5 text-primary" />
+              Company Logo
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Preview */}
+            <div className="flex justify-center">
+              <div className="w-32 h-32 bg-muted rounded-xl border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt="Logo preview"
+                    className="w-full h-full object-contain p-2"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <Building2 className="w-12 h-12 text-muted-foreground/50" />
+                )}
+              </div>
+            </div>
+
+            {/* File Upload */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                Upload Logo
+              </Label>
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors"
+              >
+                {isUploadingLogo ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm text-muted-foreground">Uploading...</span>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="w-6 h-6 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">Click to upload an image</p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">PNG, JPG, SVG up to 2MB</p>
+                  </>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">or</span>
+              </div>
+            </div>
+
+            {/* URL Input */}
+            <div className="space-y-2">
+              <Label htmlFor="logoUrl" className="text-sm font-medium flex items-center gap-2">
+                <Link2 className="w-4 h-4" />
+                Logo URL
+              </Label>
+              <Input
+                id="logoUrl"
+                type="url"
+                placeholder="https://example.com/logo.png"
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                className="h-11"
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            {settings.logo && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handleLogoRemove}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Remove
+              </Button>
+            )}
+            <div className="flex-1" />
+            <Button type="button" variant="outline" onClick={() => setShowLogoModal(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleLogoSave}>
+              Save Logo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

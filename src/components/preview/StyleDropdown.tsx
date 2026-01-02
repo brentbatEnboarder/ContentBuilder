@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Palette, ChevronDown, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,7 +29,16 @@ const styleLabels: Record<ImageStyleType, string> = {
 export const StyleDropdown = ({ onNavigateToSettings, onStyleChange }: StyleDropdownProps) => {
   const { settings, selectStyle, save } = useStyleSettings();
 
+  // Local state for immediate UI feedback
+  const [localStyle, setLocalStyle] = useState<ImageStyleType>(settings.selectedStyle);
+
+  // Sync local state when settings change (e.g., from another component)
+  useEffect(() => {
+    setLocalStyle(settings.selectedStyle);
+  }, [settings.selectedStyle]);
+
   const handleStyleSelect = (style: ImageStyleType) => {
+    setLocalStyle(style); // Update local state immediately for UI feedback
     selectStyle(style);
     save();
     onStyleChange?.();
@@ -39,7 +49,7 @@ export const StyleDropdown = ({ onNavigateToSettings, onStyleChange }: StyleDrop
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="h-9 gap-2">
           <Palette className="w-4 h-4" />
-          <span className="text-sm">Style: {styleLabels[settings.selectedStyle]}</span>
+          <span className="text-sm">Style: {styleLabels[localStyle]}</span>
           <ChevronDown className="w-3.5 h-3.5" />
         </Button>
       </DropdownMenuTrigger>
@@ -51,7 +61,7 @@ export const StyleDropdown = ({ onNavigateToSettings, onStyleChange }: StyleDrop
             className="flex justify-between"
           >
             <span>{styleLabels[style]}</span>
-            {settings.selectedStyle === style && (
+            {localStyle === style && (
               <Check className="w-4 h-4 text-primary" />
             )}
           </DropdownMenuItem>

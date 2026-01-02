@@ -387,9 +387,10 @@ export const apiClient = {
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+        }
 
         // Process complete SSE messages (each ends with \n\n)
         const messages = buffer.split('\n\n');
@@ -425,6 +426,29 @@ export const apiClient = {
             }
           } catch (parseError) {
             console.warn('Failed to parse SSE message:', dataStr);
+          }
+        }
+
+        // Exit after processing if stream is done
+        if (done) break;
+      }
+
+      // Process any remaining data in buffer after stream ends
+      if (buffer.trim()) {
+        const dataMatch = buffer.match(/^data:\s*(.+)$/m);
+        if (dataMatch) {
+          const dataStr = dataMatch[1].trim();
+          if (dataStr !== '[DONE]') {
+            try {
+              const event = JSON.parse(dataStr);
+              if (event.type === 'image' && event.image) {
+                onImage(event.image, event.variationIndex, event.totalCount);
+              } else if (event.type === 'complete') {
+                onComplete(event.duration || 0);
+              }
+            } catch (parseError) {
+              console.warn('Failed to parse final SSE message:', dataStr);
+            }
           }
         }
       }

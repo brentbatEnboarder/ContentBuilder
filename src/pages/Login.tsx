@@ -150,11 +150,14 @@ export function Login() {
 
       {/* Right side - Hero image */}
       <div className="hidden lg:block lg:w-1/2 relative">
-        <img
-          src="/logingraphic.png"
-          alt="Content creation illustration"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+        <picture>
+          <source srcSet="/logingraphic.webp" type="image/webp" />
+          <img
+            src="/logingraphic.png"
+            alt="Content creation illustration"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        </picture>
         {/* Optional overlay for better blending */}
         <div className="absolute inset-0 bg-gradient-to-l from-transparent to-[#1a1625]/20" />
       </div>

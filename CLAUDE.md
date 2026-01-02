@@ -23,6 +23,8 @@ npm run dev:server       # Backend only
 ```bash
 npm run build            # Build frontend (tsc + vite)
 npm run build:server     # Build backend (tsc)
+npm run build:all        # Build both frontend and backend (for production)
+npm run start            # Start production server (serves frontend + API)
 npm test                 # Run Jest tests (server)
 npm run lint             # ESLint
 npx tsc --noEmit         # Type check without emitting
@@ -152,6 +154,39 @@ GOOGLE_API_KEY=...       # Google Gemini API key for image generation (Nano Bana
 FIRECRAWL_API_KEY=...
 BRAVE_SEARCH_API_KEY=... # Brave Search API key for web search (get free key at https://brave.com/search/api/)
 ```
+
+## Deployment (Railway)
+
+The app is deployed to Railway as a single service that serves both the Express API and the static frontend.
+
+### Configuration
+- **Config file:** `railway.json` defines build and deploy commands
+- **Build command:** `npm run build:all` (builds frontend + backend)
+- **Start command:** `npm run start` (runs Express server)
+- **Node version:** Railway uses Node 18 by default (packages prefer Node 20+)
+
+### How Production Serving Works
+In production (`NODE_ENV=production`), the Express server:
+1. Serves the API routes at `/api/*`
+2. Serves static files from `/dist` (frontend build)
+3. Falls back to `index.html` for SPA routing (all non-API routes)
+
+**Important:** Express 5 changed wildcard routing. Use `app.use()` for catch-all middleware instead of `app.get('*', ...)` which fails with path-to-regexp v8+.
+
+### Environment Variables (Railway)
+All env vars must be set in Railway's Variables tab before building (VITE_ vars are baked into the frontend at build time):
+```
+NODE_ENV=production
+SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY
+FIRECRAWL_API_KEY, BRAVE_SEARCH_API_KEY
+```
+
+### Supabase Auth Redirect URLs
+Add these to Supabase Dashboard → Authentication → URL Configuration:
+- Site URL: `https://your-app.up.railway.app`
+- Redirect URLs: `http://localhost:5173/**`, `https://your-app.up.railway.app/**`
 
 ## Coding Patterns
 
@@ -510,5 +545,6 @@ You are an expert content writer for Enboarder...
 | `server/src/services/claude.ts` | Claude API with content tags, image planning, generate_image tool |
 | `server/src/services/imageGen.ts` | Gemini image generation + editImageWithReference |
 | `server/src/services/intelligentScraper.ts` | Multi-page Claude-directed scraper |
+| `railway.json` | Railway deployment configuration (build/start commands) |
 | `IMAGE_MODAL_IMPLEMENTATION.md` | Detailed implementation guide for remaining work |
 | `loveable-ai-content-generator/` | Lovable prototype repo (reference) |

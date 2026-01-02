@@ -26,7 +26,24 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 // Security & middleware
 app.use(helmet({
-  contentSecurityPolicy: isProduction ? undefined : false,
+  contentSecurityPolicy: isProduction ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      connectSrc: [
+        "'self'",
+        "https://qobjinzombhqfnzepgvz.supabase.co",
+        "wss://qobjinzombhqfnzepgvz.supabase.co",
+        "https://accounts.google.com",
+        "https://www.googleapis.com",
+      ],
+      frameSrc: ["'self'", "https://accounts.google.com"],
+      formAction: ["'self'", "https://accounts.google.com"],
+    },
+  } : false,
 }));
 
 // In production, allow same-origin. In dev, allow localhost frontend

@@ -18,7 +18,7 @@ export const ColorPicker = ({ label, value, onChange }: ColorPickerProps) => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setInputValue(newValue);
-    
+
     // Validate hex color
     if (/^#[0-9A-Fa-f]{6}$/.test(newValue)) {
       onChange(newValue);
@@ -36,15 +36,15 @@ export const ColorPicker = ({ label, value, onChange }: ColorPickerProps) => {
   };
 
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-sm font-medium text-foreground">{label}</span>
-      <div className="flex items-center gap-2 p-2 bg-muted rounded-md border border-border">
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-2 p-1.5 bg-gradient-to-br from-muted/50 to-muted/30 rounded-lg border border-border/50 hover:border-primary/30 transition-colors">
         <button
           type="button"
           onClick={handleSwatchClick}
           className={cn(
-            'w-8 h-8 rounded-md border border-border cursor-pointer',
-            'hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all'
+            'w-7 h-7 rounded-md border border-border/50 cursor-pointer shadow-sm',
+            'hover:scale-105 hover:shadow-md transition-all duration-200'
           )}
           style={{ backgroundColor: value }}
         />
@@ -60,7 +60,7 @@ export const ColorPicker = ({ label, value, onChange }: ColorPickerProps) => {
           value={inputValue}
           onChange={handleInputChange}
           className={cn(
-            'flex-1 bg-transparent text-sm font-mono text-foreground',
+            'flex-1 min-w-0 bg-transparent text-xs font-mono text-foreground',
             'focus:outline-none uppercase'
           )}
           placeholder="#000000"

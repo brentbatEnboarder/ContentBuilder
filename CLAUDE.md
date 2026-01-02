@@ -128,6 +128,14 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 41. **Tool Execution Indicators** - Chat shows spinners with contextual messages ("Searching the web...", "Reading webpage...", "Generating image...")
 42. **Empty Preview Redesign** - Helpful empty state with CSS illustration, tip cards, and arrow pointing to chat
 43. **Chat UI Polish** - Enhanced chat bubbles with shadows, semantic purple colors, and elevated input area with focus states
+44. **Consistent Card Pattern** - All settings screens use unified card design with gradient headers, icons, and shadows
+45. **Left Navigation Redesign** - Section labels (Setup/Content), active state left accent bar, polished user menu with gradient avatar
+46. **User Chat Bubbles** - Gradient slate background, User icon avatar (distinct from AI's Enboarder icon)
+47. **Content Preview Card** - Header with FileText icon, "Generated Content" label, Sparkles accent
+48. **Company Info Screen Polish** - Website Scanner card, Scan Progress with green accents, improved logo placeholder
+49. **Brand Voice Screen Redesign** - Side-by-side layout (sliders left, live preview right), 4-column voice profile summary
+50. **Image Style Screen Redesign** - 6-column color picker row, style cards with descriptions and hover zoom effect
+51. **Image Generation Modal** - Centered robot painter animation fix
 
 ## Environment Variables
 
@@ -294,8 +302,8 @@ Claude wraps publishable content in `<content>` tags:
 ### Chat Styling
 - **AI Avatar**: Purple circle (`bg-primary`) with white Enboarder icon, shadow
 - **AI Bubble**: Semantic purple (`bg-primary/15 border-primary/10`), rounded-2xl with shadow
-- **User Avatar**: Black circle with white Enboarder icon
-- **User Bubble**: Light gray (`bg-muted`), rounded-2xl with shadow
+- **User Avatar**: Slate gradient (`from-slate-600 to-slate-800`) with User icon from Lucide
+- **User Bubble**: Slate gradient (`from-slate-100 to-slate-200`), rounded-2xl with shadow, dark mode support
 - **Hover effects**: Bubbles elevate on hover (`hover:shadow-md`)
 - **Input area**: Gradient background, elevated input box with focus glow
 - **Markdown**: Both chat and preview pane support full markdown via react-markdown

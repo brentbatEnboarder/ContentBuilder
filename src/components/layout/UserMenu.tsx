@@ -53,8 +53,8 @@ export const UserMenu = ({ isCollapsed }: UserMenuProps) => {
       <div className="flex flex-col items-center gap-2">
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>
-            <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center cursor-pointer">
-              <span className="text-sm font-medium text-primary-foreground">
+            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center cursor-pointer shadow-md shadow-primary/20 ring-2 ring-primary/20">
+              <span className="text-sm font-semibold text-primary-foreground">
                 {initials}
               </span>
             </div>
@@ -70,7 +70,7 @@ export const UserMenu = ({ isCollapsed }: UserMenuProps) => {
           <TooltipTrigger asChild>
             <button
               onClick={handleLogout}
-              className="p-2 rounded-md text-muted-foreground hover:bg-secondary hover:text-secondary-foreground transition-colors"
+              className="p-2 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all duration-200"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -82,9 +82,9 @@ export const UserMenu = ({ isCollapsed }: UserMenuProps) => {
   }
 
   return (
-    <div className="group flex items-center gap-3 p-2 rounded-md hover:bg-muted transition-colors">
-      <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-        <span className="text-sm font-medium text-primary-foreground">
+    <div className="group flex items-center gap-3 p-2 rounded-lg hover:bg-background/80 transition-all duration-200">
+      <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0 shadow-md shadow-primary/20 ring-2 ring-primary/20">
+        <span className="text-sm font-semibold text-primary-foreground">
           {initials}
         </span>
       </div>
@@ -95,9 +95,9 @@ export const UserMenu = ({ isCollapsed }: UserMenuProps) => {
       <button
         onClick={handleLogout}
         className={cn(
-          'p-1.5 rounded-md text-muted-foreground',
-          'opacity-0 group-hover:opacity-100 transition-opacity',
-          'hover:bg-secondary hover:text-secondary-foreground'
+          'p-1.5 rounded-lg text-muted-foreground',
+          'opacity-0 group-hover:opacity-100 transition-all duration-200',
+          'hover:bg-destructive/10 hover:text-destructive'
         )}
       >
         <LogOut className="h-4 w-4" />

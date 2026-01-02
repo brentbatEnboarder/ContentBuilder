@@ -84,139 +84,104 @@ const RobotPainterAnimation = () => {
   ];
 
   return (
-    <div className="relative w-80 h-64 mx-auto">
-      {/* Sparkles */}
+    <div className="relative w-80 h-64 mx-auto flex items-center justify-center">
+      {/* Sparkles - positioned relative to center */}
       {sparklePositions.map((pos, i) => (
         <Sparkle key={i} delay={pos.delay} x={pos.x} y={pos.y} />
       ))}
 
-      {/* Canvas/Easel */}
-      <motion.div
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-40 bg-background rounded-lg border-4 border-muted shadow-lg overflow-hidden"
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-      >
-        {/* Paint strokes on canvas */}
-        <svg className="w-full h-full" viewBox="0 0 200 180">
-          {strokePaths.map((path, i) => (
-            <PaintStroke key={i} color={strokeColors[i]} delay={i * 0.4} path={path} />
-          ))}
-
-          {/* Abstract shapes */}
-          <motion.circle
-            cx="50"
-            cy="50"
-            r="20"
-            fill="#F3E8FF"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 0.7 }}
-            transition={{ delay: 2, duration: 0.5 }}
-          />
-          <motion.circle
-            cx="160"
-            cy="40"
-            r="15"
-            fill="#E0AAFF"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 0.6 }}
-            transition={{ delay: 2.3, duration: 0.5 }}
-          />
-        </svg>
-      </motion.div>
-
-      {/* Easel legs */}
-      <motion.div
-        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-52 h-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
-      >
-        <div className="absolute left-4 bottom-0 w-2 h-8 bg-muted-foreground/30 rounded transform -rotate-12 origin-bottom" />
-        <div className="absolute right-4 bottom-0 w-2 h-8 bg-muted-foreground/30 rounded transform rotate-12 origin-bottom" />
-      </motion.div>
-
-      {/* Robot arm with paintbrush */}
-      <motion.div
-        className="absolute -right-4 top-1/2 -translate-y-1/2"
-        animate={{
-          rotate: [-5, 5, -5],
-          y: [-2, 2, -2],
-        }}
-        transition={{
-          duration: 2,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-      >
-        {/* Robot hand */}
-        <div className="relative">
-          <motion.div
-            className="w-12 h-16 bg-gradient-to-b from-muted to-muted-foreground/20 rounded-lg shadow-md"
-            style={{ transformOrigin: 'center right' }}
-          >
-            {/* Robot hand details */}
-            <div className="absolute top-2 left-2 right-2 h-2 bg-primary/30 rounded" />
-            <div className="absolute top-6 left-2 right-2 h-1 bg-primary/20 rounded" />
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-2 h-2 bg-primary rounded-full animate-pulse" />
-          </motion.div>
-
-          {/* Paintbrush */}
-          <motion.div
-            className="absolute -left-20 top-1/2 -translate-y-1/2 flex items-center"
-            animate={{
-              rotate: [-2, 2, -2],
-            }}
-            transition={{
-              duration: 1,
-              repeat: Infinity,
-              ease: 'easeInOut',
-            }}
-          >
-            {/* Brush handle */}
-            <div className="w-16 h-3 bg-gradient-to-r from-amber-700 to-amber-600 rounded-r-full" />
-            {/* Brush ferrule */}
-            <div className="w-2 h-4 bg-muted-foreground/50 rounded-sm" />
-            {/* Brush bristles */}
-            <motion.div
-              className="w-6 h-5 bg-gradient-to-r from-primary to-purple-400 rounded-l-full"
-              animate={{
-                scaleY: [1, 1.1, 1],
-              }}
-              transition={{
-                duration: 0.5,
-                repeat: Infinity,
-              }}
-            />
-          </motion.div>
-        </div>
-      </motion.div>
-
-      {/* Paint drops */}
-      {[0, 1, 2].map((i) => (
+      {/* Canvas/Easel - centered container */}
+      <div className="relative">
         <motion.div
-          key={i}
-          className="absolute rounded-full"
-          style={{
-            width: 8 - i * 2,
-            height: 8 - i * 2,
-            left: `${55 + i * 10}%`,
-            top: '70%',
-            backgroundColor: strokeColors[i],
-          }}
-          initial={{ y: -20, opacity: 0 }}
+          className="w-48 h-40 bg-background rounded-lg border-4 border-muted shadow-lg overflow-hidden"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          {/* Paint strokes on canvas */}
+          <svg className="w-full h-full" viewBox="0 0 200 180">
+            {strokePaths.map((path, i) => (
+              <PaintStroke key={i} color={strokeColors[i]} delay={i * 0.4} path={path} />
+            ))}
+
+            {/* Abstract shapes */}
+            <motion.circle
+              cx="50"
+              cy="50"
+              r="20"
+              fill="#F3E8FF"
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 0.7 }}
+              transition={{ delay: 2, duration: 0.5 }}
+            />
+            <motion.circle
+              cx="160"
+              cy="40"
+              r="15"
+              fill="#E0AAFF"
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 0.6 }}
+              transition={{ delay: 2.3, duration: 0.5 }}
+            />
+          </svg>
+        </motion.div>
+
+        {/* Robot arm with paintbrush - positioned relative to canvas */}
+        <motion.div
+          className="absolute -right-16 top-1/2 -translate-y-1/2"
           animate={{
-            y: [0, 10, 0],
-            opacity: [0, 1, 0],
+            rotate: [-5, 5, -5],
+            y: [-2, 2, -2],
           }}
           transition={{
             duration: 2,
-            delay: i * 0.5,
             repeat: Infinity,
             ease: 'easeInOut',
           }}
-        />
-      ))}
+        >
+          {/* Robot hand */}
+          <div className="relative">
+            <motion.div
+              className="w-12 h-16 bg-gradient-to-b from-muted to-muted-foreground/20 rounded-lg shadow-md"
+              style={{ transformOrigin: 'center right' }}
+            >
+              {/* Robot hand details */}
+              <div className="absolute top-2 left-2 right-2 h-2 bg-primary/30 rounded" />
+              <div className="absolute top-6 left-2 right-2 h-1 bg-primary/20 rounded" />
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-2 h-2 bg-primary rounded-full animate-pulse" />
+            </motion.div>
+
+            {/* Paintbrush */}
+            <motion.div
+              className="absolute -left-20 top-1/2 -translate-y-1/2 flex items-center"
+              animate={{
+                rotate: [-2, 2, -2],
+              }}
+              transition={{
+                duration: 1,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }}
+            >
+              {/* Brush handle */}
+              <div className="w-16 h-3 bg-gradient-to-r from-amber-700 to-amber-600 rounded-r-full" />
+              {/* Brush ferrule */}
+              <div className="w-2 h-4 bg-muted-foreground/50 rounded-sm" />
+              {/* Brush bristles */}
+              <motion.div
+                className="w-6 h-5 bg-gradient-to-r from-primary to-purple-400 rounded-l-full"
+                animate={{
+                  scaleY: [1, 1.1, 1],
+                }}
+                transition={{
+                  duration: 0.5,
+                  repeat: Infinity,
+                }}
+              />
+            </motion.div>
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 };

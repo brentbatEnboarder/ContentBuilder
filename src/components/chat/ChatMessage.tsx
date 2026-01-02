@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Paperclip, Loader2, ZoomIn, Check, Pencil, Search, Globe } from 'lucide-react';
+import { Paperclip, Loader2, ZoomIn, Check, Pencil, Search, Globe, User } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ChatMessage as ChatMessageType } from '@/types/page';
@@ -54,14 +54,12 @@ export const ChatMessage = ({ message, onSelectImage, onEditImage }: ChatMessage
         )}>
           <div className={cn(
             'w-7 h-7 rounded-full flex items-center justify-center shadow-sm',
-            isUser ? 'bg-foreground' : 'bg-primary'
+            isUser
+              ? 'bg-gradient-to-br from-slate-600 to-slate-800'
+              : 'bg-primary'
           )}>
             {isUser ? (
-              <img
-                src="/enboarder-icon-white.png"
-                alt="You"
-                className="w-4 h-4"
-              />
+              <User className="w-4 h-4 text-white" strokeWidth={2.5} />
             ) : (
               <img
                 src="/enboarder-icon-white.png"
@@ -82,10 +80,10 @@ export const ChatMessage = ({ message, onSelectImage, onEditImage }: ChatMessage
 
         <div
           className={cn(
-            'px-4 py-3 rounded-2xl shadow-sm transition-shadow duration-200',
+            'px-4 py-3 rounded-2xl transition-all duration-200',
             isUser
-              ? 'bg-muted text-foreground rounded-br-md hover:shadow-md'
-              : 'bg-primary/15 text-foreground rounded-bl-md border border-primary/10 hover:shadow-md'
+              ? 'bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 text-foreground rounded-br-md shadow-md hover:shadow-lg border border-slate-200/50 dark:border-slate-600/50'
+              : 'bg-primary/15 text-foreground rounded-bl-md border border-primary/10 shadow-sm hover:shadow-md'
           )}
         >
           <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0">

@@ -18,17 +18,17 @@ export const VoiceSlider = ({
   onChange,
 }: VoiceSliderProps) => {
   return (
-    <div className="py-5">
-      <div className="mb-4">
-        <h3 className="text-base font-medium text-foreground">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
+    <div className="py-4">
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
       </div>
-      
-      <div className="flex items-center gap-4">
-        <span className="text-sm text-muted-foreground w-28 text-right flex-shrink-0">
+
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-muted-foreground w-24 text-right flex-shrink-0 font-medium">
           {leftLabel}
         </span>
-        
+
         <div className="flex-1 relative">
           <Slider
             value={[value]}
@@ -43,15 +43,15 @@ export const VoiceSlider = ({
             {[0, 1, 2, 3, 4].map((step) => (
               <div
                 key={step}
-                className={`w-1 h-1 rounded-full ${
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${
                   step <= value ? 'bg-primary' : 'bg-border'
                 }`}
               />
             ))}
           </div>
         </div>
-        
-        <span className="text-sm text-muted-foreground w-28 flex-shrink-0">
+
+        <span className="text-xs text-muted-foreground w-24 flex-shrink-0 font-medium">
           {rightLabel}
         </span>
       </div>

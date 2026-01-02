@@ -42,12 +42,13 @@ export const TopHeader = ({ activeScreen }: TopHeaderProps) => {
   const [editValue, setEditValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const isPageEditor = activeScreen === 'new-page' || activeScreen === 'page-editor';
-  const canEditTitle = isPageEditor && actions?.onTitleChange;
+  const isPageEditor = activeScreen === 'page-editor';
+  const isNewPage = activeScreen === 'new-page';
+  const canEditTitle = (isPageEditor || isNewPage) && actions?.onTitleChange;
 
-  // For page editor, show save button when dirty or just saved
+  // For page editor/new page, show save button when dirty or just saved
   // For other screens, only show when there are changes
-  const showButtons = isPageEditor
+  const showButtons = (isPageEditor || isNewPage)
     ? (actions?.hasChanges || actions?.showSaved)
     : actions?.hasChanges;
 
@@ -105,7 +106,7 @@ export const TopHeader = ({ activeScreen }: TopHeaderProps) => {
           <img
             src="/ACGLogo.png"
             alt="AI Content Generator"
-            className="h-10 w-auto"
+            className="h-12 w-auto"
           />
         )}
       </div>
@@ -137,7 +138,7 @@ export const TopHeader = ({ activeScreen }: TopHeaderProps) => {
               )}
             </h1>
           )}
-          {config.subtitle && !isPageEditor && (
+          {config.subtitle && !isPageEditor && !isNewPage && (
             <p className="text-sm text-muted-foreground leading-tight">
               {config.subtitle}
             </p>
@@ -149,7 +150,7 @@ export const TopHeader = ({ activeScreen }: TopHeaderProps) => {
       <div className="w-48 shrink-0 flex justify-end gap-3">
         {showButtons && actions && (
           <>
-            {!isPageEditor && (
+            {!isPageEditor && !isNewPage && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -162,7 +163,7 @@ export const TopHeader = ({ activeScreen }: TopHeaderProps) => {
             <Button
               size="sm"
               onClick={actions.onSave}
-              disabled={isPageEditor ? (!actions.hasChanges && !actions.showSaved) : actions.isSaving}
+              disabled={(isPageEditor || isNewPage) ? (!actions.hasChanges && !actions.showSaved) : actions.isSaving}
               className="gap-2"
             >
               {actions.showSaved ? (

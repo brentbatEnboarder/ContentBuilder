@@ -61,7 +61,8 @@ if (isProduction) {
   app.use(express.static(staticPath));
 
   // SPA fallback - serve index.html for all non-API routes
-  app.get('*', (_req: Request, res: Response) => {
+  // Express 5 requires named wildcard parameters
+  app.use((_req: Request, res: Response) => {
     res.sendFile(path.join(staticPath, 'index.html'));
   });
 } else {

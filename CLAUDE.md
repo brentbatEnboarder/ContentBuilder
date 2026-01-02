@@ -138,6 +138,10 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 49. **Brand Voice Screen Redesign** - Side-by-side layout (sliders left, live preview right), 4-column voice profile summary
 50. **Image Style Screen Redesign** - 6-column color picker row, style cards with descriptions and hover zoom effect
 51. **Image Generation Modal** - Centered robot painter animation fix
+52. **Favicon & PWA Support** - Complete favicon set (SVG, ICO, PNG, Apple touch icon) + web manifest
+53. **Login Image WebP Optimization** - 1.2MB PNG → 73KB WebP (94% reduction) with `<picture>` fallback
+54. **SSE Buffer Fix** - Process remaining buffer after stream ends (fixes missing 3rd image)
+55. **Dropdown Immediate Feedback** - StyleDropdown uses local state for instant UI updates
 
 ## Environment Variables
 
@@ -163,7 +167,31 @@ The app is deployed to Railway as a single service that serves both the Express 
 - **Config file:** `railway.json` defines build and deploy commands
 - **Build command:** `npm run build:all` (builds frontend + backend)
 - **Start command:** `npm run start` (runs Express server)
-- **Node version:** Railway uses Node 18 by default (packages prefer Node 20+)
+- **Node version:** Node 20+ required (set via `engines` in package.json, deploys as Node 24)
+- **Production URL:** `https://acg.up.railway.app`
+
+### Build Script Paths
+Build scripts use explicit `./node_modules/.bin/` paths because Nixpacks doesn't add `node_modules/.bin` to PATH during the build step:
+```json
+"build": "./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build"
+```
+
+### Content Security Policy (CSP)
+The Express server configures CSP via Helmet to allow Supabase and Google OAuth:
+```typescript
+// server/src/index.ts
+contentSecurityPolicy: {
+  directives: {
+    connectSrc: [
+      "'self'",
+      "https://qobjinzombhqfnzepgvz.supabase.co",
+      "wss://qobjinzombhqfnzepgvz.supabase.co",
+      "https://accounts.google.com",
+    ],
+    frameSrc: ["'self'", "https://accounts.google.com"],
+  },
+}
+```
 
 ### How Production Serving Works
 In production (`NODE_ENV=production`), the Express server:
@@ -185,8 +213,13 @@ FIRECRAWL_API_KEY, BRAVE_SEARCH_API_KEY
 
 ### Supabase Auth Redirect URLs
 Add these to Supabase Dashboard → Authentication → URL Configuration:
-- Site URL: `https://your-app.up.railway.app`
-- Redirect URLs: `http://localhost:5173/**`, `https://your-app.up.railway.app/**`
+- Site URL: `https://acg.up.railway.app`
+- Redirect URLs: `http://localhost:5173/**`, `https://acg.up.railway.app/**`
+
+### Google OAuth Configuration
+In Google Cloud Console OAuth 2.0 credentials:
+- **Authorized JavaScript origins:** `https://acg.up.railway.app`
+- **Authorized redirect URIs:** `https://qobjinzombhqfnzepgvz.supabase.co/auth/v1/callback`
 
 ## Coding Patterns
 
@@ -493,6 +526,40 @@ apiClient.generateImagesStream(
 ```
 
 **Performance improvement**: 3 placements × 3 variations went from ~3 minutes (sequential) to ~30 seconds (parallel).
+
+### SSE Stream Buffer Handling
+When parsing SSE streams, always process remaining buffer after the stream ends:
+```typescript
+// In api.ts generateImagesStream()
+while (true) {
+  const { done, value } = await reader.read();
+  if (value) buffer += decoder.decode(value, { stream: true });
+  // Process complete messages...
+  if (done) break;
+}
+// IMPORTANT: Process any remaining data in buffer after stream ends
+if (buffer.trim()) {
+  // Parse and handle final event
+}
+```
+This fixes issues where the last SSE event gets stuck in the buffer if not followed by `\n\n`.
+
+### Dropdown Immediate Feedback Pattern
+For dropdowns that trigger async saves, use local state for immediate UI feedback:
+```typescript
+const [localValue, setLocalValue] = useState(settings.value);
+
+useEffect(() => {
+  setLocalValue(settings.value); // Sync when server state changes
+}, [settings.value]);
+
+const handleSelect = (value) => {
+  setLocalValue(value);  // Immediate UI update
+  selectValue(value);    // Update hook state
+  save();                // Trigger async save
+};
+```
+This ensures the first click registers visually without waiting for React Query cache updates.
 
 ### Claude API Logging
 Full system prompts and messages are logged to the backend console:

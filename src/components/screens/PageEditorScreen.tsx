@@ -175,6 +175,33 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     [updateGeneratedContent, generatedContent.images, generatedContent.contentBlocks, blocks, updateBlock]
   );
 
+  // Handle block updates (inline editing) - syncs to both local blocks and generatedContent
+  const handleUpdateBlock = useCallback(
+    (blockId: string, updates: Partial<ContentBlock>) => {
+      // Update the local blocks state
+      updateBlock(blockId, updates);
+
+      // Also sync to generatedContent for persistence
+      const updatedBlocks = blocks.map((block) => {
+        if (block.id !== blockId) return block;
+        return { ...block, ...updates } as ContentBlock;
+      });
+
+      // Extract text from text blocks
+      const textContent = updatedBlocks
+        .filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text')
+        .map((b) => b.content)
+        .join('\n\n');
+
+      updateGeneratedContent({
+        text: textContent,
+        images: generatedContent.images,
+        contentBlocks: updatedBlocks,
+      });
+    },
+    [updateBlock, blocks, generatedContent.images, updateGeneratedContent]
+  );
+
   const {
     messages,
     isLoading,
@@ -483,7 +510,9 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
             contentBlocks={blocks}
             onReorderBlocks={reorderBlocks}
             onDeleteBlock={deleteBlock}
+            onUpdateBlock={handleUpdateBlock}
             isGeneratingImages={isGeneratingImages}
+            pageTitle={page?.title || 'Untitled'}
           />
         </div>
       </div>

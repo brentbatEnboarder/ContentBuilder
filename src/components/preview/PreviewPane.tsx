@@ -32,6 +32,9 @@ interface PreviewPaneProps {
   contentBlocks?: ContentBlock[];
   onReorderBlocks?: (fromIndex: number, toIndex: number) => void;
   onDeleteBlock?: (blockId: string) => void;
+  onUpdateBlock?: (blockId: string, updates: Partial<ContentBlock>) => void;
+  // Page title for downloads
+  pageTitle?: string;
 }
 
 export const PreviewPane = ({
@@ -45,6 +48,8 @@ export const PreviewPane = ({
   contentBlocks = [],
   onReorderBlocks,
   onDeleteBlock,
+  onUpdateBlock,
+  pageTitle = 'Untitled',
 }: PreviewPaneProps) => {
   const hasContent = content.text.length > 0;
   const hasContentBlocks = contentBlocks.length > 0;
@@ -61,6 +66,9 @@ export const PreviewPane = ({
         isGenerating={isGenerating}
         onNavigateToVoice={onNavigateToVoice}
         onRegenerate={onRegenerate}
+        contentBlocks={contentBlocks}
+        pageTitle={pageTitle}
+        images={content.images}
       />
 
       <ScrollArea className="flex-1">
@@ -71,6 +79,7 @@ export const PreviewPane = ({
               blocks={contentBlocks}
               onReorder={onReorderBlocks || (() => {})}
               onDeleteImage={onDeleteBlock || (() => {})}
+              onUpdateBlock={onUpdateBlock}
             />
           ) : (
             <>

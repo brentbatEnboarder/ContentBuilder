@@ -28,12 +28,14 @@ interface DraggableContentPreviewProps {
   blocks: ContentBlock[];
   onReorder: (fromIndex: number, toIndex: number) => void;
   onDeleteImage: (blockId: string) => void;
+  onUpdateBlock?: (blockId: string, updates: Partial<ContentBlock>) => void;
 }
 
 export const DraggableContentPreview = ({
   blocks,
   onReorder,
   onDeleteImage,
+  onUpdateBlock,
 }: DraggableContentPreviewProps) => {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [_overId, setOverId] = useState<string | null>(null);
@@ -166,7 +168,16 @@ export const DraggableContentPreview = ({
 
                   {/* Block content */}
                   {block.type === 'text' ? (
-                    <TextBlock id={block.id} content={block.content} />
+                    <TextBlock
+                      id={block.id}
+                      content={block.content}
+                      onUpdate={
+                        onUpdateBlock
+                          ? (content) => onUpdateBlock(block.id, { content })
+                          : undefined
+                      }
+                      isEditable={!!onUpdateBlock}
+                    />
                   ) : (
                     <DraggableImageCard
                       id={block.id}

@@ -10,7 +10,7 @@
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:server\"",
     "dev:frontend": "vite",
     "dev:server": "cd server && npm run dev",
-    "build": "npx tsc -b && npx vite build",
+    "build": "tsc -b && vite build",
     "build:server": "cd server && npm run build",
     "build:all": "npm run build && npm run build:server",
     "start": "cd server && npm run start",

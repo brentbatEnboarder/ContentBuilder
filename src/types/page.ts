@@ -10,6 +10,8 @@ export interface ChatMessage {
   images?: string[];
   /** Whether an image is currently being generated for this message */
   isGeneratingImage?: boolean;
+  /** Currently active tool (web_search, scrape_url, generate_image) */
+  activeTool?: string | null;
 }
 
 export interface FileAttachment {

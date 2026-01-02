@@ -1,9 +1,16 @@
 import { useState } from 'react';
-import { Paperclip, Loader2, ZoomIn, Check, Pencil } from 'lucide-react';
+import { Paperclip, Loader2, ZoomIn, Check, Pencil, Search, Globe } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ChatMessage as ChatMessageType } from '@/types/page';
 import { cn } from '@/lib/utils';
+
+// Map tool names to user-friendly labels and icons
+const toolLabels: Record<string, { label: string; icon: typeof Loader2 }> = {
+  web_search: { label: 'Searching the web...', icon: Search },
+  scrape_url: { label: 'Reading webpage...', icon: Globe },
+  generate_image: { label: 'Generating image...', icon: Loader2 },
+};
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -38,7 +45,7 @@ export const ChatMessage = ({ message, onSelectImage, onEditImage }: ChatMessage
   return (
     <>
       <div className={cn(
-        'flex flex-col max-w-[85%] gap-1',
+        'flex flex-col max-w-[85%] gap-1.5',
         isUser ? 'self-end items-end' : 'self-start items-start'
       )}>
         <div className={cn(
@@ -46,11 +53,9 @@ export const ChatMessage = ({ message, onSelectImage, onEditImage }: ChatMessage
           isUser ? 'flex-row-reverse' : 'flex-row'
         )}>
           <div className={cn(
-            'w-6 h-6 rounded-full flex items-center justify-center',
-            isUser ? 'bg-foreground' : ''
-          )}
-            style={!isUser ? { backgroundColor: '#7C21CC' } : undefined}
-          >
+            'w-7 h-7 rounded-full flex items-center justify-center shadow-sm',
+            isUser ? 'bg-foreground' : 'bg-primary'
+          )}>
             {isUser ? (
               <img
                 src="/enboarder-icon-white.png"
@@ -77,12 +82,11 @@ export const ChatMessage = ({ message, onSelectImage, onEditImage }: ChatMessage
 
         <div
           className={cn(
-            'px-4 py-3 rounded-xl',
+            'px-4 py-3 rounded-2xl shadow-sm transition-shadow duration-200',
             isUser
-              ? 'bg-muted text-foreground rounded-br-sm'
-              : 'text-foreground rounded-bl-sm'
+              ? 'bg-muted text-foreground rounded-br-md hover:shadow-md'
+              : 'bg-primary/15 text-foreground rounded-bl-md border border-primary/10 hover:shadow-md'
           )}
-          style={!isUser ? { backgroundColor: '#e0c4f4' } : undefined}
         >
           <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -159,11 +163,19 @@ export const ChatMessage = ({ message, onSelectImage, onEditImage }: ChatMessage
             </div>
           )}
 
-          {/* Image generating indicator */}
-          {message.isGeneratingImage && (
+          {/* Tool execution indicator (web search, scraping, image generation) */}
+          {message.activeTool && (
             <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Generating image...</span>
+              {(() => {
+                const tool = toolLabels[message.activeTool];
+                const IconComponent = tool?.icon || Loader2;
+                return (
+                  <>
+                    <IconComponent className="w-4 h-4 animate-spin" />
+                    <span>{tool?.label || 'Processing...'}</span>
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>

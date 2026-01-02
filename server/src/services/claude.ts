@@ -946,6 +946,9 @@ export type StreamEvent =
 /**
  * Generate streaming content with tool support
  * This is an enhanced version of generateContentStream that can handle tool calls
+ *
+ * IMPORTANT: When Claude calls a tool, we execute it and then make a follow-up
+ * API call with the tool result so Claude can continue generating.
  */
 export async function* generateContentStreamWithTools(
   request: GenerateContentRequest,
@@ -954,6 +957,8 @@ export async function* generateContentStreamWithTools(
     success: boolean;
     imageBase64?: string;
     mimeType?: string;
+    searchResults?: Array<{ title: string; url: string; snippet: string }>;
+    scrapedContent?: { title: string; content: string; url: string };
     error?: string;
   }>
 ): AsyncGenerator<StreamEvent, void, unknown> {
@@ -1006,7 +1011,13 @@ You can fetch and read content from specific URLs when the user:
 - Says things like "check this link", "read this page", "what's on this website"
 - Wants you to reference content from a particular webpage
 
-When using these tools, always explain what you found to the user in a helpful way.`;
+When using these tools, always explain what you found to the user in a helpful way.
+
+### IMPORTANT: Tool Usage Limits
+- Limit yourself to 2-3 tool calls maximum per request
+- After gathering initial information, proceed to generate content - don't keep searching for more
+- If you have enough information to create useful content, do so rather than perfecting your research
+- The user wants content quickly, not exhaustive research`;
 
   // Log the full system prompt and messages being sent
   console.log('\n' + '═'.repeat(80));
@@ -1023,92 +1034,179 @@ When using these tools, always explain what you found to the user in a helpful w
   }
   console.log('═'.repeat(80) + '\n');
 
-  try {
-    const stream = await client.messages.stream({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
-      system: enhancedSystemPrompt,
-      messages,
-      tools: [imageGenerationTool, webSearchTool, scrapeUrlTool],
-    });
+  // Track the conversation for potential tool continuation
+  let currentMessages = [...messages];
+  let continueLoop = true;
+  const maxIterations = 10; // Allow more tool calls for complex research
+  let iteration = 0;
 
-    let currentToolUseId: string | null = null;
-    let currentToolName: string | null = null;
-    let toolInputJson = '';
+  while (continueLoop && iteration < maxIterations) {
+    iteration++;
+    continueLoop = false; // Will be set to true if we need to continue after tool use
 
-    for await (const event of stream) {
-      if (event.type === 'content_block_start') {
-        if (event.content_block.type === 'tool_use') {
-          currentToolUseId = event.content_block.id;
-          currentToolName = event.content_block.name;
-          toolInputJson = '';
-          yield { type: 'tool_use_start', toolName: currentToolName, toolUseId: currentToolUseId };
-        }
-      } else if (event.type === 'content_block_delta') {
-        if (event.delta.type === 'text_delta') {
-          yield { type: 'text', text: event.delta.text };
-        } else if (event.delta.type === 'input_json_delta') {
-          toolInputJson += event.delta.partial_json;
-        }
-      } else if (event.type === 'content_block_stop') {
-        // If we were building a tool call, execute it now
-        if (currentToolUseId && currentToolName && onToolCall) {
-          try {
-            const toolInput = JSON.parse(toolInputJson);
+    try {
+      const stream = await client.messages.stream({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4096,
+        system: enhancedSystemPrompt,
+        messages: currentMessages,
+        tools: [imageGenerationTool, webSearchTool, scrapeUrlTool],
+      });
 
-            // Apply default style if not specified
-            if (!toolInput.style) {
-              toolInput.style = defaultStyleId;
+      // Collect the full response to build the assistant message
+      const assistantContentBlocks: Anthropic.ContentBlock[] = [];
+      const toolCalls: Array<{
+        id: string;
+        name: string;
+        input: Record<string, unknown>;
+      }> = [];
+
+      let currentToolUseId: string | null = null;
+      let currentToolName: string | null = null;
+      let toolInputJson = '';
+
+      for await (const event of stream) {
+        if (event.type === 'content_block_start') {
+          if (event.content_block.type === 'tool_use') {
+            currentToolUseId = event.content_block.id;
+            currentToolName = event.content_block.name;
+            toolInputJson = '';
+            yield { type: 'tool_use_start', toolName: currentToolName, toolUseId: currentToolUseId };
+          } else if (event.content_block.type === 'text') {
+            // Text block starting - we'll collect the text via deltas
+          }
+        } else if (event.type === 'content_block_delta') {
+          if (event.delta.type === 'text_delta') {
+            yield { type: 'text', text: event.delta.text };
+          } else if (event.delta.type === 'input_json_delta') {
+            toolInputJson += event.delta.partial_json;
+          }
+        } else if (event.type === 'content_block_stop') {
+          // If we were building a tool call, save it
+          if (currentToolUseId && currentToolName) {
+            try {
+              const toolInput = JSON.parse(toolInputJson);
+
+              // Apply default style if not specified
+              if (!toolInput.style) {
+                toolInput.style = defaultStyleId;
+              }
+              if (!toolInput.aspectRatio) {
+                toolInput.aspectRatio = '16:9';
+              }
+
+              toolCalls.push({
+                id: currentToolUseId,
+                name: currentToolName,
+                input: toolInput,
+              });
+            } catch {
+              console.error('[Claude] Failed to parse tool input JSON');
             }
-            if (!toolInput.aspectRatio) {
-              toolInput.aspectRatio = '16:9';
+
+            currentToolUseId = null;
+            currentToolName = null;
+            toolInputJson = '';
+          }
+        }
+      }
+
+      // Get the final message to extract content blocks
+      const finalMessage = await stream.finalMessage();
+
+      // If there were tool calls, execute them and continue
+      if (toolCalls.length > 0 && onToolCall) {
+        // Build the assistant's response with tool use blocks
+        const assistantContent: Anthropic.ContentBlockParam[] = [];
+
+        // Add any text blocks from the response
+        for (const block of finalMessage.content) {
+          if (block.type === 'text') {
+            assistantContent.push({ type: 'text', text: block.text });
+          } else if (block.type === 'tool_use') {
+            assistantContent.push({
+              type: 'tool_use',
+              id: block.id,
+              name: block.name,
+              input: block.input as Record<string, unknown>,
+            });
+          }
+        }
+
+        // Add assistant message with tool calls
+        currentMessages.push({
+          role: 'assistant',
+          content: assistantContent,
+        });
+
+        // Execute all tool calls and collect results
+        const toolResults: Anthropic.ToolResultBlockParam[] = [];
+
+        for (const toolCall of toolCalls) {
+          const result = await onToolCall(toolCall.name, toolCall.input);
+
+          // Yield the tool result to the frontend
+          yield {
+            type: 'tool_result',
+            result: {
+              toolName: toolCall.name,
+              toolUseId: toolCall.id,
+              result,
+            },
+          };
+
+          // Build the tool result content for Claude
+          let toolResultContent: string;
+          if (result.success) {
+            if (result.searchResults) {
+              toolResultContent = `Search results:\n${result.searchResults.map((r, i) =>
+                `${i + 1}. **${r.title}**\n   URL: ${r.url}\n   ${r.snippet}`
+              ).join('\n\n')}`;
+            } else if (result.scrapedContent) {
+              toolResultContent = `Page content from ${result.scrapedContent.url}:\n\nTitle: ${result.scrapedContent.title}\n\n${result.scrapedContent.content}`;
+            } else if (result.imageBase64) {
+              toolResultContent = 'Image generated successfully. The image has been displayed to the user.';
+            } else {
+              toolResultContent = 'Tool executed successfully.';
             }
-
-            const result = await onToolCall(currentToolName, toolInput);
-
-            yield {
-              type: 'tool_result',
-              result: {
-                toolName: currentToolName,
-                toolUseId: currentToolUseId,
-                result,
-              },
-            };
-          } catch (parseError) {
-            yield {
-              type: 'tool_result',
-              result: {
-                toolName: currentToolName,
-                toolUseId: currentToolUseId,
-                result: {
-                  success: false,
-                  error: 'Failed to parse tool input',
-                },
-              },
-            };
+          } else {
+            toolResultContent = `Error: ${result.error || 'Unknown error'}`;
           }
 
-          currentToolUseId = null;
-          currentToolName = null;
-          toolInputJson = '';
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: toolCall.id,
+            content: toolResultContent,
+          });
         }
-      }
-    }
 
-    yield { type: 'done' };
-  } catch (error) {
-    if (error instanceof Anthropic.APIError) {
-      if (error.status === 429) {
-        yield { type: 'error', error: 'Rate limit exceeded. Please try again in a moment.' };
+        // Add user message with tool results
+        currentMessages.push({
+          role: 'user',
+          content: toolResults,
+        });
+
+        // Continue the loop to get Claude's response to the tool results
+        continueLoop = true;
+        console.log('[Claude] Tool calls executed, continuing conversation...');
+      }
+    } catch (error) {
+      if (error instanceof Anthropic.APIError) {
+        if (error.status === 429) {
+          yield { type: 'error', error: 'Rate limit exceeded. Please try again in a moment.' };
+          return;
+        }
+        yield { type: 'error', error: `API error: ${error.message}` };
         return;
       }
-      yield { type: 'error', error: `API error: ${error.message}` };
+
+      yield {
+        type: 'error',
+        error: `Streaming failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
       return;
     }
-
-    yield {
-      type: 'error',
-      error: `Streaming failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    };
   }
+
+  yield { type: 'done' };
 }

@@ -79,7 +79,7 @@ export const ChatInput = ({
 
   return (
     <div
-      className="relative border-t border-border bg-card p-4"
+      className="relative bg-gradient-to-t from-muted/50 via-background to-background border-t border-border px-4 pt-3 pb-4"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -98,7 +98,7 @@ export const ChatInput = ({
 
       {/* File attachments */}
       {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-2">
+        <div className="flex flex-wrap gap-2 mb-3">
           {attachments.map(file => (
             <FileChip
               key={file.id}
@@ -110,7 +110,7 @@ export const ChatInput = ({
       )}
 
       {/* Style Dropdown + Generate Imagery Button */}
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2 mb-3">
         {onNavigateToStyle && (
           <StyleDropdown
             onNavigateToSettings={onNavigateToStyle}
@@ -120,7 +120,7 @@ export const ChatInput = ({
         {onGenerateImages && (
           <Button
             variant="outline"
-            className="flex-1 gap-2"
+            className="flex-1 gap-2 bg-background hover:bg-muted"
             onClick={onGenerateImages}
             disabled={!hasContent || isGeneratingImages}
           >
@@ -139,8 +139,8 @@ export const ChatInput = ({
         )}
       </div>
 
-      {/* Input box with embedded buttons */}
-      <div className="relative border border-border rounded-lg bg-background focus-within:ring-1 focus-within:ring-ring">
+      {/* Input box with embedded buttons - elevated card style */}
+      <div className="relative rounded-xl bg-background border border-border shadow-sm shadow-primary/5 focus-within:shadow-md focus-within:shadow-primary/10 focus-within:border-primary/30 transition-all duration-200">
         <textarea
           ref={textareaRef}
           value={value}
@@ -148,7 +148,7 @@ export const ChatInput = ({
           onKeyDown={handleKeyDown}
           placeholder="Type, paste URL, or drop files..."
           disabled={disabled}
-          className="w-full min-h-[80px] max-h-[160px] px-3 py-2 pb-10 bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground disabled:opacity-50"
+          className="w-full min-h-[80px] max-h-[160px] px-4 py-3 pb-12 bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground disabled:opacity-50"
           rows={2}
         />
 
@@ -160,7 +160,7 @@ export const ChatInput = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
+                className="h-8 w-8 rounded-lg hover:bg-muted"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={disabled}
               >
@@ -177,7 +177,7 @@ export const ChatInput = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
+                  className="h-8 w-8 rounded-lg hover:bg-muted"
                   disabled
                 >
                   <Mic className="w-4 h-4" />
@@ -188,7 +188,7 @@ export const ChatInput = ({
 
             <Button
               size="icon"
-              className="h-7 w-7"
+              className="h-8 w-8 rounded-lg shadow-sm"
               onClick={handleSubmit}
               disabled={!canSend}
             >
@@ -199,7 +199,7 @@ export const ChatInput = ({
       </div>
 
       {hasUrl && (
-        <div className="flex items-center gap-1.5 mt-2 text-sm text-primary">
+        <div className="flex items-center gap-1.5 mt-3 text-sm text-primary">
           <Link className="w-3.5 h-3.5" />
           <span>URL detected - will extract content</span>
         </div>

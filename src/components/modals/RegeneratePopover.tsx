@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
+import { StyleDropdown } from '../preview/StyleDropdown';
+import { useStyleSettings } from '../../hooks/useStyleSettings';
 import type { PlacementType } from '../../types/content';
 
 interface RegeneratePopoverProps {
@@ -11,7 +13,7 @@ interface RegeneratePopoverProps {
   placementId: string;
   placementType: PlacementType;
   currentPrompt: string;
-  onRegenerate: (placementId: string, newPrompt: string) => void;
+  onRegenerate: (placementId: string, newPrompt: string, styleId?: string) => void;
   onClose: () => void;
 }
 
@@ -27,6 +29,7 @@ export const RegeneratePopover = ({
   const [prompt, setPrompt] = useState(currentPrompt);
   const popoverRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { settings: styleSettings } = useStyleSettings();
 
   // Reset prompt when popover opens
   useEffect(() => {
@@ -61,7 +64,7 @@ export const RegeneratePopover = ({
   }, [isOpen, onClose]);
 
   const handleRegenerate = () => {
-    onRegenerate(placementId, prompt.trim() || currentPrompt);
+    onRegenerate(placementId, prompt.trim() || currentPrompt, styleSettings.selectedStyle);
     onClose();
   };
 
@@ -121,9 +124,12 @@ export const RegeneratePopover = ({
 
             <div className="p-5 space-y-4">
               {/* Header */}
-              <h3 className="text-base font-semibold text-foreground">
-                Regenerate {placementLabel} Images
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-foreground">
+                  Regenerate {placementLabel} Images
+                </h3>
+                <StyleDropdown onNavigateToSettings={() => {}} />
+              </div>
 
               {/* Current Prompt */}
               <div>

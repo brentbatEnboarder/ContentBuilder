@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import { cn } from '../../lib/utils';
 import { StyleDropdown } from '../preview/StyleDropdown';
+import { useStyleSettings } from '../../hooks/useStyleSettings';
 import type { ImagePlacement, AspectRatio } from '../../types/imageGeneration';
 
 interface ImageSelectionGridProps {
@@ -13,7 +14,7 @@ interface ImageSelectionGridProps {
   skippedPlacements: Set<string>;
   onSelectImage: (placementId: string, imageId: string) => void;
   onSkipPlacement: (placementId: string, skipped: boolean) => void;
-  onRegenerate: (placementId: string) => void;
+  onRegenerate: (placementId: string, styleId: string) => void;
   onImageClick: (placementId: string, imageId: string) => void;
   onEditClick: (placementId: string, imageId: string) => void;
   onApply: () => void;
@@ -169,6 +170,7 @@ const PlacementGroup = ({
   placement,
   selectedImageId,
   isSkipped,
+  currentStyleId,
   onSelectImage,
   onSkip,
   onRegenerate,
@@ -179,9 +181,10 @@ const PlacementGroup = ({
   placement: ImagePlacement;
   selectedImageId?: string;
   isSkipped: boolean;
+  currentStyleId: string;
   onSelectImage: (imageId: string) => void;
   onSkip: (skipped: boolean) => void;
-  onRegenerate: () => void;
+  onRegenerate: (styleId: string) => void;
   onImageClick: (imageId: string) => void;
   onEditClick: (imageId: string) => void;
   isLast: boolean;
@@ -208,13 +211,12 @@ const PlacementGroup = ({
         <div className="flex items-center gap-3 flex-shrink-0">
           <StyleDropdown
             onNavigateToSettings={() => {}}
-            onStyleChange={() => {}}
           />
           <Button
             variant="outline"
             size="sm"
             className="gap-2 text-xs"
-            onClick={onRegenerate}
+            onClick={() => onRegenerate(currentStyleId)}
             disabled={isSkipped}
           >
             <RefreshCw className="w-3 h-3" />
@@ -269,6 +271,9 @@ export const ImageSelectionGrid = ({
   onApply,
   onCancel,
 }: ImageSelectionGridProps) => {
+  // Get current style from global settings
+  const { settings: styleSettings } = useStyleSettings();
+
   // Calculate selection count
   const nonSkippedPlacements = placements.filter((p) => !skippedPlacements.has(p.id));
   const selectedCount = nonSkippedPlacements.filter((p) => selectedImages[p.id]).length;
@@ -286,9 +291,10 @@ export const ImageSelectionGrid = ({
             placement={placement}
             selectedImageId={selectedImages[placement.id]}
             isSkipped={skippedPlacements.has(placement.id)}
+            currentStyleId={styleSettings.selectedStyle}
             onSelectImage={(imageId) => onSelectImage(placement.id, imageId)}
             onSkip={(skipped) => onSkipPlacement(placement.id, skipped)}
-            onRegenerate={() => onRegenerate(placement.id)}
+            onRegenerate={(styleId) => onRegenerate(placement.id, styleId)}
             onImageClick={(imageId) => onImageClick(placement.id, imageId)}
             onEditClick={(imageId) => onEditClick(placement.id, imageId)}
             isLast={index === placements.length - 1}

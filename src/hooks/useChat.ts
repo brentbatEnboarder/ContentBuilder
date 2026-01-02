@@ -253,18 +253,20 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
               )
             );
           },
-          // onToolStart - Claude is calling a tool (e.g., generate_image)
+          // onToolStart - Claude is calling a tool (e.g., generate_image, web_search)
           (toolName: string, _toolId: string) => {
-            if (toolName === 'generate_image') {
-              // Show generating indicator
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, isGeneratingImage: true }
-                    : msg
-                )
-              );
-            }
+            // Update message to show which tool is active
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? {
+                      ...msg,
+                      activeTool: toolName,
+                      isGeneratingImage: toolName === 'generate_image',
+                    }
+                  : msg
+              )
+            );
           },
           // onToolResult - Tool execution completed
           (result) => {
@@ -280,6 +282,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
                         ...msg,
                         images: [...(msg.images || []), imageUrl],
                         isGeneratingImage: false,
+                        activeTool: null,
                       }
                     : msg
                 )
@@ -292,8 +295,18 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
                     ? {
                         ...msg,
                         isGeneratingImage: false,
+                        activeTool: null,
                         content: msg.content + `\n\n*Image generation failed: ${result.result.error}*`,
                       }
+                    : msg
+                )
+              );
+            } else {
+              // Other tools (web_search, scrape_url) - just clear the active tool
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, activeTool: null }
                     : msg
                 )
               );

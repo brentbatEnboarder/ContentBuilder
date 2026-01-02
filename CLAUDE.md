@@ -123,6 +123,11 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 36. **URL Scraping Tool** - Claude can fetch and read content from specific URLs when user provides a link
 37. **Login Screen Redesign** - Split layout with dark left panel (logo, title, form) and hero image on right
 38. **Google Authentication** - OAuth login via Supabase with "Continue with Google" button
+39. **Pages Grid Redesign** - Pinterest-style grid layout with thumbnail cards showing header images, content previews, word/image counts
+40. **Tool Call Continuation** - Fixed critical bug where tool results (web_search, scrape_url) weren't sent back to Claude for continuation
+41. **Tool Execution Indicators** - Chat shows spinners with contextual messages ("Searching the web...", "Reading webpage...", "Generating image...")
+42. **Empty Preview Redesign** - Helpful empty state with CSS illustration, tip cards, and arrow pointing to chat
+43. **Chat UI Polish** - Enhanced chat bubbles with shadows, semantic purple colors, and elevated input area with focus states
 
 ## Environment Variables
 
@@ -287,11 +292,33 @@ Claude wraps publishable content in `<content>` tags:
 - `currentContent` prop passes existing content back to AI for follow-up edits
 
 ### Chat Styling
-- **AI Avatar**: Purple circle (#7C21CC) with white Enboarder icon
-- **AI Bubble**: Light purple background (#e0c4f4)
+- **AI Avatar**: Purple circle (`bg-primary`) with white Enboarder icon, shadow
+- **AI Bubble**: Semantic purple (`bg-primary/15 border-primary/10`), rounded-2xl with shadow
 - **User Avatar**: Black circle with white Enboarder icon
-- **User Bubble**: Light gray (bg-muted)
+- **User Bubble**: Light gray (`bg-muted`), rounded-2xl with shadow
+- **Hover effects**: Bubbles elevate on hover (`hover:shadow-md`)
+- **Input area**: Gradient background, elevated input box with focus glow
 - **Markdown**: Both chat and preview pane support full markdown via react-markdown
+
+### Tool Call Continuation Pattern
+When Claude calls tools (web_search, scrape_url, generate_image), the backend must send results back to Claude:
+
+```typescript
+// In generateContentStreamWithTools():
+// 1. Claude calls tool → yield tool_use_start event
+// 2. Execute tool → yield tool_result event to frontend
+// 3. Build tool_result message for Claude
+// 4. Make follow-up API call with tool results
+// 5. Claude continues generating with the information
+// 6. Loop until no more tool calls (max 10 iterations)
+```
+
+The `activeTool` property on `ChatMessage` tracks which tool is running:
+- `web_search` → "Searching the web..."
+- `scrape_url` → "Reading webpage..."
+- `generate_image` → "Generating image..."
+
+Tool usage is limited to 2-3 calls per request to prevent over-researching.
 
 ### Chat Input Layout
 Compact layout with all controls in one area:
@@ -468,6 +495,9 @@ You are an expert content writer for Enboarder...
 | `src/components/modals/` | Image generation modal components (5 files) |
 | `src/components/content/` | Draggable content components (4 files) |
 | `src/components/screens/PageEditorScreen.tsx` | Chat + preview split view for content creation |
+| `src/components/screens/PagesScreen.tsx` | Pages grid with thumbnail cards |
+| `src/components/pages/PageCard.tsx` | Thumbnail card with image preview, content stats |
+| `src/components/preview/EmptyPreview.tsx` | Helpful empty state with tips |
 | `src/pages/CustomerSelection.tsx` | Customer selection with logos |
 | `server/src/services/claude.ts` | Claude API with content tags, image planning, generate_image tool |
 | `server/src/services/imageGen.ts` | Gemini image generation + editImageWithReference |

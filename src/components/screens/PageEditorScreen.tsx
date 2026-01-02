@@ -504,13 +504,10 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
           skippedPlacements={imageModal.skippedPlacements}
           onSelectImage={imageModal.selectImage}
           onSkipPlacement={imageModal.skipPlacement}
-          onRegenerate={(placementId) => {
-            const placement = imageModal.placements.find((p) => p.id === placementId);
+          onRegenerate={(placementId, _styleId) => {
+            // styleId is passed but we open the popover which has its own style selector
+            // The popover reads the current style when user clicks regenerate
             imageModal.openRegenerate(placementId, null);
-            // Store placement type for the popover
-            if (placement) {
-              // The popover will use this data
-            }
           }}
           onImageClick={imageModal.openLightbox}
           onEditClick={(placementId, imageId) => imageModal.openEdit(imageId, placementId)}

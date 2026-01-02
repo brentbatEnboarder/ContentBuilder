@@ -89,7 +89,7 @@ export const PagesScreen = ({ onEditPage, onCreatePage }: PagesScreenProps) => {
   const noResults = pages.length === 0 && searchQuery.length > 0;
 
   return (
-    <div className={isEmpty ? "h-full flex items-center justify-center" : "p-8 max-w-4xl mx-auto"}>
+    <div className={isEmpty ? "h-full flex items-center justify-center" : "p-8 max-w-6xl mx-auto"}>
       {isEmpty ? (
         <EmptyPagesState onCreatePage={handleCreatePage} companyName={companySettings.name} />
       ) : (
@@ -112,7 +112,7 @@ export const PagesScreen = ({ onEditPage, onCreatePage }: PagesScreenProps) => {
             </Button>
           </div>
 
-          {/* Page List */}
+          {/* Page Grid */}
           {noResults ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground">
@@ -120,7 +120,7 @@ export const PagesScreen = ({ onEditPage, onCreatePage }: PagesScreenProps) => {
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {pages.map((page) => (
                 <PageCard
                   key={page.id}

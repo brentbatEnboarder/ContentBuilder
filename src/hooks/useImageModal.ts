@@ -369,10 +369,14 @@ export function useImageModal(options: UseImageModalOptions = {}) {
   }, []);
 
   // Regenerate placement images
+  // styleId parameter allows overriding the style for this specific regeneration
   const regeneratePlacement = useCallback(
-    async (placementId: string, newPrompt: string) => {
+    async (placementId: string, newPrompt: string, styleId?: string) => {
       const placement = placements.find((p) => p.id === placementId);
       if (!placement) return;
+
+      // Use provided styleId or fall back to currentStyleId
+      const effectiveStyleId = styleId || currentStyleId;
 
       // Set images to loading
       setPlacements((prev) =>
@@ -387,7 +391,7 @@ export function useImageModal(options: UseImageModalOptions = {}) {
       try {
         const response = await apiClient.generateImages({
           contentSummary: newPrompt,
-          styleId: currentStyleId,
+          styleId: effectiveStyleId,
           aspectRatio: placement.aspectRatio,
           count: 3,
         });

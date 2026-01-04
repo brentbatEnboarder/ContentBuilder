@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useCustomer } from '@/contexts/CustomerContext';
-import { apiClient, ScrapeProgress } from '@/services/api';
+import { apiClient, ScrapeProgress, LogoCandidate } from '@/services/api';
 
 export interface BrandColors {
   primary: string;
@@ -43,6 +43,8 @@ interface ScanState {
   progress: ScrapeProgress | null;
   scannedPages: string[];
   canScanMore: boolean;
+  logoCandidates: LogoCandidate[];
+  streamingDescription: string; // Accumulated extraction chunks
   error: string | null;
 }
 
@@ -51,6 +53,8 @@ const defaultScanState: ScanState = {
   progress: null,
   scannedPages: [],
   canScanMore: false,
+  logoCandidates: [],
+  streamingDescription: '',
   error: null,
 };
 
@@ -159,6 +163,7 @@ export const useCompanySettings = () => {
       isScanning: true,
       error: null,
       progress: null,
+      streamingDescription: '',
     }));
 
     try {
@@ -166,6 +171,27 @@ export const useCompanySettings = () => {
         draft.url,
         (progress) => {
           setScanState((prev) => ({ ...prev, progress }));
+
+          // Handle logo_found event - update logo immediately
+          if (progress.type === 'logo_found') {
+            if (progress.logo) {
+              setDraft((prev) => ({ ...prev, logo: progress.logo! }));
+            }
+            if (progress.logoCandidates) {
+              setScanState((prev) => ({
+                ...prev,
+                logoCandidates: progress.logoCandidates || [],
+              }));
+            }
+          }
+
+          // Handle extraction_chunk event - accumulate streaming description
+          if (progress.type === 'extraction_chunk' && progress.chunk) {
+            setScanState((prev) => ({
+              ...prev,
+              streamingDescription: prev.streamingDescription + progress.chunk,
+            }));
+          }
         }
       );
 
@@ -189,6 +215,8 @@ export const useCompanySettings = () => {
           ...prev,
           scannedPages: result.pagesScraped,
           canScanMore: result.canScanMore,
+          logoCandidates: result.logoCandidates || prev.logoCandidates,
+          streamingDescription: '', // Clear streaming state when complete
         }));
       }
     } catch (err) {
@@ -257,6 +285,8 @@ export const useCompanySettings = () => {
     scanProgress: scanState.progress,
     scannedPages: scanState.scannedPages,
     canScanMore: scanState.canScanMore,
+    logoCandidates: scanState.logoCandidates,
+    streamingDescription: scanState.streamingDescription,
     updateDraft,
     updateColors,
     save,

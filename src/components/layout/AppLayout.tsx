@@ -1,7 +1,9 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { LeftNav } from './LeftNav';
 import { TopHeader } from './TopHeader';
-import { useNavigation } from '@/hooks/useNavigation';
+import { WizardBanner } from '@/components/onboarding/WizardBanner';
+import { useNavigation, ScreenType } from '@/hooks/useNavigation';
+import { useOnboarding, OnboardingStep } from '@/contexts/OnboardingContext';
 import { CompanyInfoScreen } from '@/components/screens/CompanyInfoScreen';
 import { BrandVoiceScreen } from '@/components/screens/BrandVoiceScreen';
 import { ImageStyleScreen } from '@/components/screens/ImageStyleScreen';
@@ -12,17 +14,37 @@ interface AppLayoutProps {
   children?: ReactNode;
 }
 
+// Map onboarding steps to screen types
+const stepToScreen: Record<OnboardingStep, ScreenType> = {
+  company: 'company',
+  voice: 'voice',
+  style: 'style',
+  pages: 'new-page', // Step 4 goes directly to page editor
+};
+
 export const AppLayout = ({ children }: AppLayoutProps) => {
-  const { 
-    isNavCollapsed, 
-    activeScreen, 
+  const {
+    isNavCollapsed,
+    activeScreen,
     editingPageId,
-    toggleNav, 
+    toggleNav,
     setActiveScreen,
     editPage,
     createNewPage,
     goToPages,
   } = useNavigation();
+
+  const { isOnboarding, currentStep } = useOnboarding();
+
+  // Sync navigation with onboarding step
+  useEffect(() => {
+    if (isOnboarding) {
+      const targetScreen = stepToScreen[currentStep];
+      if (targetScreen !== activeScreen) {
+        setActiveScreen(targetScreen);
+      }
+    }
+  }, [isOnboarding, currentStep, activeScreen, setActiveScreen]);
 
   const renderScreen = () => {
     switch (activeScreen) {
@@ -65,6 +87,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     return (
       <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
         <TopHeader activeScreen={activeScreen} />
+        <WizardBanner />
         <div className="flex flex-1 overflow-hidden">
           <LeftNav
             isCollapsed={isNavCollapsed}
@@ -83,6 +106,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   return (
     <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
       <TopHeader activeScreen={activeScreen} />
+      <WizardBanner />
       <div className="flex flex-1 overflow-hidden">
         <LeftNav
           isCollapsed={isNavCollapsed}

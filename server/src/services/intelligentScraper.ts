@@ -1,19 +1,24 @@
 import Firecrawl from '@mendable/firecrawl-js';
 import Anthropic from '@anthropic-ai/sdk';
 import { Vibrant } from 'node-vibrant/node';
+import { searchForLogoWithFallback, LogoCandidate } from './logoSearch';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface ScrapeProgress {
-  type: 'status' | 'page_scraped' | 'analyzing' | 'extracting' | 'complete' | 'error';
+  type: 'status' | 'page_scraped' | 'analyzing' | 'extracting' | 'extraction_chunk' | 'logo_found' | 'logo_search' | 'complete' | 'error';
   message: string;
   pageUrl?: string;
   pageTitle?: string;
   pagesScraped?: number;
   totalPages?: number;
   result?: ExtractedCompanyInfo; // Included in 'complete' type
+  logo?: string; // Included in 'logo_found' type
+  logoCandidates?: LogoCandidate[]; // Included in 'logo_found' type
+  chunk?: string; // Included in 'extraction_chunk' type
+  partialExtraction?: Partial<ExtractedCompanyInfo>; // Partial results during streaming
 }
 
 export interface BrandColors {
@@ -30,6 +35,7 @@ export interface ExtractedCompanyInfo {
   industry: string;
   description: string;
   logo: string | null;
+  logoCandidates?: LogoCandidate[]; // Additional logo options from image search
   colors: BrandColors;
   pagesScraped: string[];
   scrapedAt: string;
@@ -268,6 +274,32 @@ export async function* intelligentScrape(
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Phase 2.5: Start logo search in parallel (runs while we scrape other pages)
+  // ─────────────────────────────────────────────────────────────────────────
+  // Extract company name from homepage title (e.g., "Acme Corp | Home" -> "Acme Corp")
+  const guessedCompanyName = scrapedPages[0].title
+    .split(/[|\-–—:]/)[0]
+    .trim()
+    .replace(/\s*(Home|Homepage|Welcome).*$/i, '')
+    .trim();
+
+  let logoSearchPromise: Promise<LogoCandidate[]> | null = null;
+  if (guessedCompanyName && guessedCompanyName.length > 1) {
+    console.log(`[Scraper] Starting parallel logo search for: "${guessedCompanyName}"`);
+    yield { type: 'logo_search', message: `Searching for ${guessedCompanyName} logo...` };
+
+    logoSearchPromise = searchForLogoWithFallback(guessedCompanyName, normalizedUrl)
+      .then((result) => {
+        console.log(`[Scraper] Logo search found ${result.candidates.length} candidates`);
+        return result.candidates;
+      })
+      .catch((error) => {
+        console.warn('[Scraper] Logo search failed (continuing without):', error);
+        return [];
+      });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Phase 3: Ask Claude to identify best pages to scrape from mapped URLs
   // ─────────────────────────────────────────────────────────────────────────
   yield { type: 'analyzing', message: 'Analyzing site structure...' };
@@ -287,56 +319,111 @@ export async function* intelligentScrape(
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Phase 4: Scrape the identified pages
+  // Phase 4: Scrape the identified pages (5 concurrent requests)
   // ─────────────────────────────────────────────────────────────────────────
   const scrapedUrls = new Set([normalizedUrl]);
+  const CONCURRENCY_LIMIT = 5;
 
-  for (let i = 0; i < pagesToScrape.length && scrapedPages.length < maxPages; i++) {
-    const page = pagesToScrape[i];
+  // Filter out already scraped URLs and limit to maxPages
+  const urlsToScrape = pagesToScrape
+    .filter((page) => !scrapedUrls.has(page.url))
+    .slice(0, maxPages - 1); // -1 for homepage already scraped
 
-    // Skip if already scraped
-    if (scrapedUrls.has(page.url)) continue;
-    scrapedUrls.add(page.url);
+  // Mark all as "to be scraped"
+  urlsToScrape.forEach((page) => scrapedUrls.add(page.url));
+
+  console.log(`[Scraper] Scraping ${urlsToScrape.length} pages with concurrency ${CONCURRENCY_LIMIT}`);
+
+  // Process in batches of CONCURRENCY_LIMIT
+  for (let batchStart = 0; batchStart < urlsToScrape.length; batchStart += CONCURRENCY_LIMIT) {
+    const batch = urlsToScrape.slice(batchStart, batchStart + CONCURRENCY_LIMIT);
 
     yield {
       type: 'status',
-      message: `Scanning: ${page.reason}`,
-      pageUrl: page.url,
+      message: `Scanning ${batch.length} pages in parallel...`,
       pagesScraped: scrapedPages.length,
-      totalPages: Math.min(maxPages, pagesToScrape.length + 1),
+      totalPages: Math.min(maxPages, urlsToScrape.length + 1),
     };
 
-    try {
-      const doc = await firecrawl.scrape(page.url, {
-        formats: ['markdown'],
-      });
+    // Scrape batch concurrently
+    const batchResults = await Promise.allSettled(
+      batch.map(async (page) => {
+        try {
+          const doc = await firecrawl.scrape(page.url, {
+            formats: ['markdown'],
+          });
+          return {
+            url: page.url,
+            title: doc.metadata?.title || page.reason,
+            content: doc.markdown || '',
+            success: true,
+          };
+        } catch (error) {
+          console.warn(`Failed to scrape ${page.url}:`, error);
+          return {
+            url: page.url,
+            title: page.reason,
+            content: '',
+            success: false,
+          };
+        }
+      })
+    );
 
-      const pageContent = doc.markdown || '';
-      const pageTitle = doc.metadata?.title || page.reason;
+    // Process results and yield progress for each
+    for (const result of batchResults) {
+      if (result.status === 'fulfilled' && result.value.success) {
+        const { url, title, content } = result.value;
+        scrapedPages.push({ url, title, content });
 
-      scrapedPages.push({
-        url: page.url,
-        title: pageTitle,
-        content: pageContent,
-      });
-
-      yield {
-        type: 'page_scraped',
-        message: `Scanned: ${pageTitle}`,
-        pageUrl: page.url,
-        pageTitle: pageTitle,
-        pagesScraped: scrapedPages.length,
-        totalPages: Math.min(maxPages, pagesToScrape.length + 1),
-      };
-
-    } catch (error) {
-      console.warn(`Failed to scrape ${page.url}:`, error);
-      // Continue with other pages
+        yield {
+          type: 'page_scraped',
+          message: `Scanned: ${title}`,
+          pageUrl: url,
+          pageTitle: title,
+          pagesScraped: scrapedPages.length,
+          totalPages: Math.min(maxPages, urlsToScrape.length + 1),
+        };
+      }
     }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Phase 5: Extract company information with Claude
+  // Phase 5a: Get logo results immediately (don't wait for Claude)
+  // ─────────────────────────────────────────────────────────────────────────
+  let logoCandidates: LogoCandidate[] = [];
+  if (logoSearchPromise) {
+    logoCandidates = await logoSearchPromise;
+    if (logoCandidates.length > 0) {
+      console.log(`[Scraper] Got ${logoCandidates.length} logo candidates from image search`);
+    }
+  }
+
+  // Determine best logo immediately
+  let bestLogo: string | null = null;
+  if (logoCandidates.length > 0) {
+    bestLogo = logoCandidates[0].url;
+    console.log(`[Scraper] Using Brave search logo: ${bestLogo}`);
+  } else if (homepageLogo) {
+    bestLogo = homepageLogo;
+    console.log(`[Scraper] Falling back to og:image: ${bestLogo}`);
+  }
+
+  // Yield logo immediately so UI can display it
+  if (bestLogo || logoCandidates.length > 0) {
+    yield {
+      type: 'logo_found',
+      message: 'Found company logo',
+      logo: bestLogo || undefined,
+      logoCandidates: logoCandidates.length > 0 ? logoCandidates : undefined,
+    };
+  }
+
+  // Start color extraction in parallel (don't await yet)
+  const colorPromise = tryExtractColors(scrapedPages, bestLogo);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Phase 5b: Extract company information with Claude (streaming)
   // ─────────────────────────────────────────────────────────────────────────
   yield { type: 'extracting', message: 'Extracting company information...' };
 
@@ -344,16 +431,33 @@ export async function* intelligentScrape(
     .map((p) => `=== ${p.title} (${p.url}) ===\n${p.content}`)
     .join('\n\n');
 
-  const extractedInfo = await extractCompanyInfo(claude, allContent, normalizedUrl);
+  // Stream the extraction for real-time feedback
+  let extractedInfo: ClaudeExtraction | null = null;
+  let streamedContent = '';
 
-  // Use homepage logo/ogImage as fallback if Claude didn't find one
-  const finalLogo = extractedInfo.logo || homepageLogo;
-  if (finalLogo && !extractedInfo.logo) {
-    console.log(`[Scraper] Using homepage og:image as logo fallback: ${finalLogo}`);
+  for await (const chunk of extractCompanyInfoStreaming(claude, allContent, normalizedUrl)) {
+    if (chunk.type === 'chunk') {
+      streamedContent += chunk.text;
+      yield { type: 'extraction_chunk', message: 'Extracting...', chunk: chunk.text };
+    } else if (chunk.type === 'complete' && chunk.result) {
+      extractedInfo = chunk.result;
+    }
   }
 
-  // Try to extract colors from any logo or OG image found
-  const colors = await tryExtractColors(scrapedPages, finalLogo);
+  // Fallback if streaming didn't complete properly
+  if (!extractedInfo) {
+    console.warn('[Scraper] Streaming extraction failed, using non-streaming fallback');
+    extractedInfo = await extractCompanyInfo(claude, allContent, normalizedUrl);
+  }
+
+  // Update bestLogo if Claude found one and we don't have one yet
+  if (!bestLogo && extractedInfo.logo) {
+    bestLogo = extractedInfo.logo;
+    console.log(`[Scraper] Using Claude-extracted logo: ${bestLogo}`);
+  }
+
+  // Wait for color extraction
+  const colors = await colorPromise;
 
   // Calculate remaining links for "scan more"
   const remainingLinks = pagesToScrape
@@ -370,7 +474,8 @@ export async function* intelligentScrape(
     name: extractedInfo.name,
     industry: extractedInfo.industry,
     description: extractedInfo.description,
-    logo: finalLogo,
+    logo: bestLogo,
+    logoCandidates: logoCandidates.length > 0 ? logoCandidates : undefined,
     colors: {
       primary: primaryColor,
       secondary: secondaryColor,
@@ -539,7 +644,14 @@ Extract the following information and return as JSON:
 
 2. "industry": The industry/sector they operate in (be specific, e.g., "HR Technology / Employee Experience Software" not just "Technology")
 
-3. "description": A COMPREHENSIVE description that will help generate excellent onboarding content. This should be 800-2500 words and cover:
+3. "description": A COMPREHENSIVE description that will help generate excellent onboarding content. This should be **2000-4000 words** and cover:
+
+   **IMPORTANT: Preserve verbatim content whenever possible!**
+   - DO NOT summarize or compress quotes, testimonials, or specific language from the source
+   - If the website says "We believe in radical transparency and continuous feedback" - keep that exact wording
+   - Preserve employee quotes, mission statements, and value descriptions word-for-word
+   - Include full descriptions of programs, benefits, and initiatives - don't abbreviate
+   - The goal is to capture the company's authentic voice and language for content generation
 
    **Company Overview:**
    - What the company does and who they serve
@@ -548,16 +660,16 @@ Extract the following information and return as JSON:
    - Company size, locations, or global presence if mentioned
 
    **Mission, Vision & Values:**
-   - Their stated mission or purpose
-   - Core values and what they mean in practice
+   - Their stated mission or purpose (quote verbatim if available)
+   - Core values and what they mean in practice (preserve exact value names and descriptions)
    - Any guiding principles or beliefs
 
    **Culture & Workplace:**
-   - Company culture characteristics
+   - Company culture characteristics (use their exact language)
    - What it's like to work there
    - Team dynamics and collaboration style
    - Work environment (remote, hybrid, in-office)
-   - Employee benefits, perks, or programs mentioned
+   - Employee benefits, perks, or programs mentioned (list all with full descriptions)
    - Diversity, equity, and inclusion initiatives
 
    **People & Leadership:**
@@ -570,7 +682,7 @@ Extract the following information and return as JSON:
    - Career development opportunities
    - Learning and development programs
    - Why people join or stay at the company
-   - Employee testimonials or quotes if available
+   - Employee testimonials or quotes (preserve complete quotes, not summaries)
 
    **History & Achievements:**
    - Company founding story
@@ -584,7 +696,8 @@ Extract the following information and return as JSON:
    - Use bullet points for lists of values, benefits, or features
    - Use > blockquotes for employee testimonials or mission statements
    - Include specific details: names, numbers, quotes, and concrete examples
-   - Avoid generic statements like "they care about their employees" - quote specific programs instead
+   - Avoid generic statements like "they care about their employees" - quote their specific programs and language instead
+   - When in doubt, include MORE content rather than less - we can always trim later
 
 4. "logo": If you find a logo URL in the content, include it. Otherwise null.
 
@@ -603,7 +716,7 @@ Return ONLY valid JSON, no other text.`;
   try {
     const response = await claude.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 8000, // Increased for comprehensive descriptions (800-2500 words)
+      max_tokens: 16000, // Increased for comprehensive descriptions (2000-4000 words with verbatim content)
       messages: [{ role: 'user', content: prompt }],
     });
 
@@ -665,6 +778,113 @@ function extractNameFromUrl(url: string): string {
     return domain.charAt(0).toUpperCase() + domain.slice(1);
   } catch {
     return 'Unknown Company';
+  }
+}
+
+// ============================================================================
+// Claude: Extract company information (STREAMING version with Haiku)
+// ============================================================================
+
+interface StreamChunk {
+  type: 'chunk' | 'complete';
+  text?: string;
+  result?: ClaudeExtraction;
+}
+
+async function* extractCompanyInfoStreaming(
+  claude: Anthropic,
+  allContent: string,
+  url: string
+): AsyncGenerator<StreamChunk, void, undefined> {
+  const prompt = `You are extracting comprehensive company information from website content for an employee onboarding content generation tool. This information will be used to create personalized onboarding content, so be thorough.
+
+<website_content>
+${allContent.slice(0, 80000)}
+</website_content>
+
+Extract the following information and return as JSON:
+
+1. "name": The official company name (not taglines)
+
+2. "industry": The industry/sector they operate in (be specific, e.g., "HR Technology / Employee Experience Software" not just "Technology")
+
+3. "description": A COMPREHENSIVE description that will help generate excellent onboarding content. This should be **1500-2500 words** and cover:
+
+   **IMPORTANT: Preserve verbatim content whenever possible!**
+   - DO NOT summarize or compress quotes, testimonials, or specific language from the source
+   - Preserve employee quotes, mission statements, and value descriptions word-for-word
+   - Include full descriptions of programs, benefits, and initiatives
+
+   **Sections to include:**
+   - Company Overview (what they do, who they serve, market position)
+   - Mission, Vision & Values (quote verbatim if available)
+   - Culture & Workplace (work environment, benefits, DEI initiatives)
+   - People & Leadership (founder story, leadership team)
+   - Career & Growth (development opportunities, testimonials)
+   - History & Achievements (founding story, milestones)
+
+   Format using **markdown** with ## headings, **bold**, bullet points, and > blockquotes.
+
+4. "logo": If you find a logo URL in the content, include it. Otherwise null.
+
+5. "suggestedColors": Brand colors as hex codes (or null if not found):
+   - "primary", "secondary", "accent", "textColor", "buttonBg", "buttonFg"
+
+Return ONLY valid JSON, no other text.`;
+
+  try {
+    // Use Haiku for faster streaming extraction
+    const stream = await claude.messages.stream({
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 8000,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    let fullText = '';
+
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        const text = event.delta.text;
+        fullText += text;
+        yield { type: 'chunk', text };
+      }
+    }
+
+    // Parse the complete response
+    const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        const extracted = JSON.parse(jsonMatch[0]);
+        const colors = extracted.suggestedColors || {};
+        yield {
+          type: 'complete',
+          result: {
+            name: extracted.name || extractNameFromUrl(url),
+            industry: extracted.industry || '',
+            description: extracted.description || '',
+            logo: extracted.logo || null,
+            suggestedColors: {
+              primary: colors.primary || null,
+              secondary: colors.secondary || null,
+              accent: colors.accent || null,
+              textColor: colors.textColor || null,
+              buttonBg: colors.buttonBg || null,
+              buttonFg: colors.buttonFg || null,
+            },
+          },
+        };
+      } catch (parseError) {
+        console.error('Failed to parse streaming extraction JSON:', parseError);
+        yield { type: 'complete', result: getDefaultExtraction(url) };
+      }
+    } else {
+      console.warn('No JSON found in streaming extraction response');
+      yield { type: 'complete', result: getDefaultExtraction(url) };
+    }
+
+  } catch (error) {
+    console.error('Streaming extraction failed:', error);
+    yield { type: 'complete', result: getDefaultExtraction(url) };
   }
 }
 

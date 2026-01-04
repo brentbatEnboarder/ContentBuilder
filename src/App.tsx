@@ -5,6 +5,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { CustomerProvider } from '@/contexts/CustomerContext';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
+import { OnboardingProvider } from '@/contexts/OnboardingContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Login } from '@/pages/Login';
 import { CustomerSelection } from '@/pages/CustomerSelection';
@@ -46,7 +47,9 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <HeaderActionsProvider>
-                        <AppLayout />
+                        <OnboardingProvider>
+                          <AppLayout />
+                        </OnboardingProvider>
                       </HeaderActionsProvider>
                     </ProtectedRoute>
                   }

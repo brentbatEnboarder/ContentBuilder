@@ -173,13 +173,23 @@ export interface ImagePlanRequest {
 // ============================================================================
 
 export interface ScrapeProgress {
-  type: 'status' | 'page_scraped' | 'analyzing' | 'extracting' | 'complete' | 'error';
+  type: 'status' | 'page_scraped' | 'analyzing' | 'extracting' | 'extraction_chunk' | 'logo_found' | 'logo_search' | 'complete' | 'error';
   message: string;
   pageUrl?: string;
   pageTitle?: string;
   pagesScraped?: number;
   totalPages?: number;
   result?: ExtractedCompanyInfo;
+  logo?: string; // Included in 'logo_found' type
+  logoCandidates?: LogoCandidate[]; // Included in 'logo_found' type
+  chunk?: string; // Included in 'extraction_chunk' type
+}
+
+export interface LogoCandidate {
+  url: string;
+  thumbnailUrl: string;
+  title: string;
+  source: string;
 }
 
 export interface BrandColors {
@@ -196,6 +206,7 @@ export interface ExtractedCompanyInfo {
   industry: string;
   description: string;
   logo: string | null;
+  logoCandidates?: LogoCandidate[];
   colors: BrandColors;
   pagesScraped: string[];
   scrapedAt: string;

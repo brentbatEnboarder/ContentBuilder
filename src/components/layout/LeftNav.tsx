@@ -8,16 +8,28 @@ import {
   FileText,
   Settings,
   Layers,
+  Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NavItem } from './NavItem';
 import { UserMenu } from './UserMenu';
+import { useOnboarding, OnboardingStep } from '@/contexts/OnboardingContext';
 import type { ScreenType } from '@/hooks/useNavigation';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+
+// Map screens to onboarding steps
+const screenToStep: Record<ScreenType, OnboardingStep | undefined> = {
+  company: 'company',
+  voice: 'voice',
+  style: 'style',
+  pages: 'pages',
+  'new-page': 'pages',
+  'page-editor': 'pages',
+};
 
 interface LeftNavProps {
   isCollapsed: boolean;
@@ -44,6 +56,8 @@ export const LeftNav = ({
   onToggle,
   onNavigate,
 }: LeftNavProps) => {
+  const { isOnboarding, isStepCompleted, canNavigateToStep } = useOnboarding();
+
   const toggleButton = (
     <button
       onClick={onToggle}
@@ -111,15 +125,33 @@ export const LeftNav = ({
         <div className="flex flex-col gap-0.5">
           {setupItems.map((item) => {
             const isActive = item.screen === activeScreen;
+            const step = screenToStep[item.screen];
+            const isCompleted = step ? isStepCompleted(step) : false;
+            const canNavigate = !isOnboarding || (step ? canNavigateToStep(step) : true);
+
             return (
-              <NavItem
-                key={item.screen}
-                icon={item.icon}
-                label={item.label}
-                isActive={isActive}
-                isCollapsed={isCollapsed}
-                onClick={() => onNavigate(item.screen)}
-              />
+              <div key={item.screen} className="relative">
+                <div className={cn(!canNavigate && 'opacity-50 pointer-events-none')}>
+                  <NavItem
+                    icon={item.icon}
+                    label={item.label}
+                    isActive={isActive}
+                    isCollapsed={isCollapsed}
+                    onClick={() => canNavigate && onNavigate(item.screen)}
+                  />
+                </div>
+                {/* Checkmark badge for completed steps */}
+                {isCompleted && (
+                  <div
+                    className={cn(
+                      'absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-primary flex items-center justify-center',
+                      isCollapsed ? 'right-0.5' : 'right-2'
+                    )}
+                  >
+                    <Check className="w-3 h-3 text-primary-foreground" />
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
@@ -131,30 +163,46 @@ export const LeftNav = ({
         <div className="flex flex-col gap-0.5">
           {contentItems.map((item) => {
             // Pages should be active when on pages or page-editor screen
-            const isActive = item.screen === activeScreen ||
+            const isActive =
+              item.screen === activeScreen ||
               (item.screen === 'pages' && activeScreen === 'page-editor');
+            const step = screenToStep[item.screen];
+            const canNavigate = !isOnboarding || (step ? canNavigateToStep(step) : true);
+
             return (
-              <NavItem
+              <div
                 key={item.screen}
-                icon={item.icon}
-                label={item.label}
-                isActive={isActive}
-                isCollapsed={isCollapsed}
-                onClick={() => onNavigate(item.screen)}
-              />
+                className={cn(!canNavigate && 'opacity-50 pointer-events-none')}
+              >
+                <NavItem
+                  icon={item.icon}
+                  label={item.label}
+                  isActive={isActive}
+                  isCollapsed={isCollapsed}
+                  onClick={() => canNavigate && onNavigate(item.screen)}
+                />
+              </div>
             );
           })}
 
           {/* New Page button */}
           <div className="mt-2">
-            <NavItem
-              icon={newPageItem.icon}
-              label={newPageItem.label}
-              isActive={activeScreen === 'new-page'}
-              isCollapsed={isCollapsed}
-              isPrimary={newPageItem.isPrimary}
-              onClick={() => onNavigate(newPageItem.screen)}
-            />
+            {(() => {
+              const step = screenToStep[newPageItem.screen];
+              const canNavigate = !isOnboarding || (step ? canNavigateToStep(step) : true);
+              return (
+                <div className={cn(!canNavigate && 'opacity-50 pointer-events-none')}>
+                  <NavItem
+                    icon={newPageItem.icon}
+                    label={newPageItem.label}
+                    isActive={activeScreen === 'new-page'}
+                    isCollapsed={isCollapsed}
+                    isPrimary={newPageItem.isPrimary}
+                    onClick={() => canNavigate && onNavigate(newPageItem.screen)}
+                  />
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>

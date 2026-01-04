@@ -4,7 +4,7 @@ import { StyleGrid } from '@/components/settings/StyleGrid';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { useStyleSettings } from '@/hooks/useStyleSettings';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
-import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useOnboardingHeaderActions } from '@/hooks/useOnboardingHeaderActions';
 import { toast } from 'sonner';
 
 export const ImageStyleScreen = () => {
@@ -32,8 +32,8 @@ export const ImageStyleScreen = () => {
     toast.info('Changes discarded');
   }, [cancelStyle, cancelColors]);
 
-  // Register actions with header
-  useRegisterHeaderActions(hasChanges, isSaving, handleSave, handleCancel);
+  // Register actions with header (uses onboarding-aware hook for wizard flow)
+  useOnboardingHeaderActions(hasChanges, isSaving, handleSave, handleCancel);
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-6">

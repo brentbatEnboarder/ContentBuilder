@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Loader2, Check, Pencil } from 'lucide-react';
+import { ArrowLeft, Loader2, Check, Pencil, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import type { ScreenType } from '@/hooks/useNavigation';
 
 interface TopHeaderProps {
@@ -35,6 +36,7 @@ const screenConfig: Record<ScreenType, { title: string; subtitle?: string }> = {
 
 export const TopHeader = ({ activeScreen }: TopHeaderProps) => {
   const { actions } = useHeaderActions();
+  const { isOnboarding, currentStep } = useOnboarding();
   const config = screenConfig[activeScreen] || { title: 'Company Info' };
 
   // Editing state for page title
@@ -45,6 +47,9 @@ export const TopHeader = ({ activeScreen }: TopHeaderProps) => {
   const isPageEditor = activeScreen === 'page-editor';
   const isNewPage = activeScreen === 'new-page';
   const canEditTitle = (isPageEditor || isNewPage) && actions?.onTitleChange;
+
+  // During onboarding, setup steps (1-3) show "Save & Next"
+  const isOnboardingSetupStep = isOnboarding && ['company', 'voice', 'style'].includes(currentStep);
 
   // For page editor/new page, show save button when dirty or just saved
   // For other screens, only show when there are changes
@@ -175,6 +180,11 @@ export const TopHeader = ({ activeScreen }: TopHeaderProps) => {
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Saving...
+                </>
+              ) : isOnboardingSetupStep ? (
+                <>
+                  Save & Next
+                  <ChevronRight className="w-4 h-4" />
                 </>
               ) : (
                 'Save'

@@ -45,7 +45,7 @@ npx tsc --noEmit         # Type check without emitting
 
 ```sql
 customers (id, name, created_by, created_at, updated_at)
-customer_settings (id, customer_id UNIQUE, company_info JSONB, voice_settings JSONB, style_settings JSONB)
+customer_settings (id, customer_id UNIQUE, company_info JSONB, voice_settings JSONB, style_settings JSONB, onboarding_completed BOOLEAN)
 pages (id, customer_id, title, content JSONB, chat_history JSONB, created_at, updated_at)
 ```
 
@@ -53,7 +53,7 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 
 ### Frontend Hooks (React Query + Supabase)
 - **`usePages.ts`** - CRUD for pages table
-- **`useCompanySettings.ts`** - Company info with intelligent URL scanning, brand colors
+- **`useCompanySettings.ts`** - Company info with intelligent URL scanning, brand colors, logo candidates
 - **`useVoiceSettings.ts`** - Voice dimension sliders (formality, humor, respect, enthusiasm)
 - **`useStyleSettings.ts`** - Image style selection
 - **`useChat.ts`** - Chat with streaming Claude API
@@ -62,10 +62,12 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 - **`useImageModal.ts`** - State machine for image generation modal (selection, lightbox, edit, regenerate)
 - **`useContentBlocks.ts`** - Content block state with drag-drop reordering
 - **`usePageEditor.ts`** - Page editing state (auto-generates titles on first save)
+- **`useOnboardingHeaderActions.ts`** - Wraps header actions for onboarding wizard flow
 
 ### Backend Services (`/server/src/services`)
 - **`scraper.ts`** - Basic Firecrawl scraping (legacy)
-- **`intelligentScraper.ts`** - Multi-page Claude-directed scraping with SSE streaming
+- **`intelligentScraper.ts`** - Multi-page Claude-directed scraping with SSE streaming + parallel logo search
+- **`logoSearch.ts`** - Brave Image Search API for company logo discovery
 - **`claude.ts`** - Claude API text generation with streaming, tools (web_search, scrape_url, generate_image)
 - **`imageGen.ts`** - Gemini image generation
 - **`webSearch.ts`** - Brave Search API for web search tool
@@ -75,6 +77,7 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 ### Backend Routes (`/server/src/routes`)
 - **POST /api/scrape** - Basic website scraping (legacy)
 - **POST /api/scrape/intelligent** - Multi-page intelligent scraping with SSE progress
+- **GET /api/image-proxy** - Proxy external images to bypass CORS (public, no auth required)
 - **POST /api/generate/text** - Claude text generation (supports `stream: true`)
 - **POST /api/generate/title** - Generate page title from content
 - **POST /api/generate/image-plan** - Analyze content and recommend images
@@ -149,6 +152,17 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 60. **Markdown Descriptions** - Company description renders markdown, with Edit button for changes
 61. **Logo Editor** - Click logo to upload file or enter URL, with preview and remove options
 62. **Inactive Profile State** - Company Profile card greyed out until scan completes
+63. **Onboarding Wizard** - 4-step wizard for new customers (Company Info → Brand Voice → Visual Style → First Page)
+64. **Personalized Onboarding** - Greets user by first name ("Hi Brent!") extracted from Google OAuth profile
+65. **Wizard Progress Indicators** - Progress dots in banner, checkmarks in left nav for completed steps
+66. **Logo Image Search** - Parallel Brave Image Search for company logos during website scan
+67. **Logo Picker Modal** - Shows up to 6 logo candidates found online, click to select
+68. **Enhanced Content Extraction** - 2000-4000 word descriptions with verbatim content preservation
+69. **Parallel Page Scraping** - 5 concurrent Firecrawl requests (matches plan limit), ~4x faster scraping
+70. **Image Proxy Endpoint** - `/api/image-proxy` bypasses CORS for external logo thumbnails
+71. **Streaming Extraction** - Claude extraction streams in real-time with Haiku (faster than Sonnet)
+72. **Immediate Logo Display** - Logo appears during scan before extraction completes
+73. **Logo Priority Change** - Brave search result used first, og:image as fallback only
 
 ## Environment Variables
 
@@ -308,12 +322,35 @@ Here's your image!
 ```
 
 ### Intelligent Scraper
-The intelligent scraper (`/api/scrape/intelligent`) uses SSE streaming:
+The intelligent scraper (`/api/scrape/intelligent`) uses SSE streaming with optimized parallelization:
+
+**Phase 1-2: URL Discovery + Homepage**
 1. Uses Firecrawl `map()` to discover ALL URLs on the site (up to 200, including from sitemap)
-2. Claude identifies best pages prioritizing: Careers, About Us, Team/People, Culture, Values
-3. Scrapes up to 20 relevant pages
-4. Claude extracts comprehensive company info (800-2500 words, markdown formatted) + 6 brand colors
-5. Real-time progress shown in UI with "Scan More" option
+2. **Parallel logo search** starts immediately using Brave Image Search API
+3. Scrapes homepage for og:image fallback
+
+**Phase 3: Page Identification**
+4. Claude identifies best pages prioritizing: Careers, About Us, Team/People, Culture, Values
+
+**Phase 4: Parallel Page Scraping**
+5. Scrapes up to 20 relevant pages with **5 concurrent requests** (matches Firecrawl plan)
+6. ~4x faster than sequential scraping
+
+**Phase 5a: Immediate Logo Display**
+7. Logo search completes → `logo_found` event sent immediately
+8. **Logo priority**: Brave search result first, og:image fallback only if no Brave results
+9. Frontend displays logo before extraction completes
+
+**Phase 5b: Streaming Extraction**
+10. Uses **Claude Haiku** (faster than Sonnet) with streaming API
+11. `extraction_chunk` events stream as Claude generates
+12. Frontend can show real-time extraction progress
+13. Extracts comprehensive company info (**1500-2500 words**, markdown formatted) + 6 brand colors
+
+**SSE Event Types:**
+```
+status → page_scraped (x20) → logo_found → extracting → extraction_chunk (many) → complete
+```
 
 The page identification prompt emphasizes career-related pages with many URL variations:
 - `/careers`, `/jobs`, `/work-with-us`, `/join-us`, `/opportunities`, `/join-our-team`
@@ -323,9 +360,19 @@ The page identification prompt emphasizes career-related pages with many URL var
 ```tsx
 await apiClient.scrapeIntelligent(
   url,
-  (progress) => { /* onProgress - updates UI */ },
+  (progress) => {
+    // Handle logo_found - update logo immediately
+    if (progress.type === 'logo_found' && progress.logo) {
+      setLogo(progress.logo);
+    }
+    // Handle extraction_chunk - show streaming text
+    if (progress.type === 'extraction_chunk' && progress.chunk) {
+      appendToDescription(progress.chunk);
+    }
+  },
   { maxPages: 20, scanMore: false }
 );
+// Returns: { ..., logo, logoCandidates: LogoCandidate[] }
 ```
 
 ### Brand Colors
@@ -351,6 +398,32 @@ Displayed on **Visual Style** screen alongside image style selection.
 - **Warm** - Soft colors, rounded shapes, cozy aesthetic
 
 Sample images stored in `/public/styles/` (400×300 optimized JPGs with lazy loading).
+
+### Onboarding Wizard
+New customers go through a 4-step wizard before accessing the full app:
+
+**Steps:**
+1. **Company Info** - "Hi {firstName}! Let's scan your customer's website..."
+2. **Brand Voice** - "Set your customer's brand voice..."
+3. **Visual Style** - "Choose branding colors and image styles..."
+4. **First Page** - "You're all set! Let's create your first piece of content."
+
+**Components:**
+- `OnboardingContext` - Tracks `currentStep`, `completedSteps`, `isOnboarding` state
+- `WizardBanner` - Progress dots, step info, Back button (appears below TopHeader)
+- `useOnboardingHeaderActions` - Wraps save to advance through wizard
+
+**Behavior:**
+- `onboarding_completed` boolean in `customer_settings` table
+- Existing customers auto-marked as completed
+- "Save & Next" button replaces "Save" during wizard
+- Left nav shows checkmarks on completed steps, disables future steps
+- After step 3, marks `onboarding_completed = true` and opens page editor
+
+```tsx
+const { isOnboarding, currentStep, nextStep, firstName } = useOnboarding();
+// firstName extracted from user.user_metadata.full_name (Google OAuth)
+```
 
 ### Header Actions Context
 Screens register save/cancel actions with the unified TopHeader via `HeaderActionsContext`:
@@ -621,9 +694,13 @@ You are an expert content writer for Enboarder...
 | `src/components/pages/PageCard.tsx` | Thumbnail card with image preview, content stats |
 | `src/components/preview/EmptyPreview.tsx` | Helpful empty state with tips |
 | `src/pages/CustomerSelection.tsx` | Customer selection with logos |
+| `src/contexts/OnboardingContext.tsx` | Onboarding wizard state, step tracking, first name extraction |
+| `src/components/onboarding/WizardBanner.tsx` | Progress dots banner with personalized greeting |
+| `src/hooks/useOnboardingHeaderActions.ts` | Wraps save to advance through wizard |
 | `server/src/services/claude.ts` | Claude API with content tags, image planning, generate_image tool |
 | `server/src/services/imageGen.ts` | Gemini image generation + editImageWithReference |
-| `server/src/services/intelligentScraper.ts` | Multi-page Claude-directed scraper |
+| `server/src/services/intelligentScraper.ts` | Multi-page Claude-directed scraper + parallel logo search |
+| `server/src/services/logoSearch.ts` | Brave Image Search API for logo discovery |
 | `railway.json` | Railway deployment configuration (build/start commands) |
 | `IMAGE_MODAL_IMPLEMENTATION.md` | Detailed implementation guide for remaining work |
 | `loveable-ai-content-generator/` | Lovable prototype repo (reference) |

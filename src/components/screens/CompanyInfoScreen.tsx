@@ -1,5 +1,5 @@
 import { useCallback, useState, useRef } from 'react';
-import { Building2, Loader2, CheckCircle2, ExternalLink, Globe, Sparkles, FileText, Eye, Edit3, ImagePlus, X, Link2, Upload } from 'lucide-react';
+import { Building2, Loader2, CheckCircle2, ExternalLink, Globe, Sparkles, FileText, Eye, Edit3, ImagePlus, X, Link2, Upload, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,7 +12,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
-import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useOnboardingHeaderActions } from '@/hooks/useOnboardingHeaderActions';
 import { useCustomer } from '@/contexts/CustomerContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -28,6 +28,7 @@ export const CompanyInfoScreen = () => {
     scanProgress,
     scannedPages,
     canScanMore,
+    logoCandidates,
     updateDraft,
     save,
     cancel,
@@ -60,8 +61,8 @@ export const CompanyInfoScreen = () => {
     toast.info('Changes discarded');
   }, [cancel]);
 
-  // Register actions with header
-  useRegisterHeaderActions(hasChanges, isSaving, handleSave, handleCancel);
+  // Register actions with header (uses onboarding-aware hook for wizard flow)
+  useOnboardingHeaderActions(hasChanges, isSaving, handleSave, handleCancel);
 
   const handleScan = async () => {
     await scanUrl();
@@ -432,7 +433,7 @@ export const CompanyInfoScreen = () => {
 
       {/* Logo Edit Modal */}
       <Dialog open={showLogoModal} onOpenChange={setShowLogoModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className={logoCandidates.length > 0 ? "sm:max-w-lg" : "sm:max-w-md"}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ImagePlus className="w-5 h-5 text-primary" />
@@ -489,6 +490,62 @@ export const CompanyInfoScreen = () => {
                 className="hidden"
               />
             </div>
+
+            {/* Logo Candidates from Image Search */}
+            {logoCandidates.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <Globe className="w-4 h-4" />
+                  Found Online
+                </Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {logoCandidates.slice(0, 6).map((candidate, index) => {
+                    return (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => setLogoUrl(candidate.url)}
+                        className={`relative aspect-square bg-muted rounded-lg border-2 overflow-hidden transition-all hover:border-primary/50 ${
+                          logoUrl === candidate.url ? 'border-primary ring-2 ring-primary/20' : 'border-border'
+                        }`}
+                        title={candidate.title}
+                      >
+                        {(candidate.url || candidate.thumbnailUrl) ? (
+                          <img
+                            src={`/api/image-proxy?url=${encodeURIComponent(candidate.url || candidate.thumbnailUrl)}`}
+                            alt={candidate.title}
+                            className="w-full h-full object-contain p-1"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              // If primary URL failed via proxy, try thumbnailUrl
+                              const currentProxiedUrl = decodeURIComponent(target.src.split('url=')[1] || '');
+                              if (currentProxiedUrl === candidate.url && candidate.thumbnailUrl && candidate.thumbnailUrl !== candidate.url) {
+                                target.src = `/api/image-proxy?url=${encodeURIComponent(candidate.thumbnailUrl)}`;
+                                return;
+                              }
+                              target.style.display = 'none';
+                              // Show fallback icon
+                              const parent = target.parentElement;
+                              if (parent && !parent.querySelector('.fallback-icon')) {
+                                const fallback = document.createElement('div');
+                                fallback.className = 'fallback-icon absolute inset-0 flex items-center justify-center text-muted-foreground';
+                                fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                                parent.appendChild(fallback);
+                              }
+                            }}
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                            <ImageIcon className="w-6 h-6" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">Click to select a logo found online</p>
+              </div>
+            )}
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

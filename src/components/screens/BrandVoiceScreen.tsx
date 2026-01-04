@@ -6,7 +6,7 @@ import { SampleCommunications } from '@/components/settings/SampleCommunications
 import { VoiceSummary } from '@/components/settings/VoiceSummary';
 import { VoiceJsonExport } from '@/components/settings/VoiceJsonExport';
 import { useVoiceSettings } from '@/hooks/useVoiceSettings';
-import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useOnboardingHeaderActions } from '@/hooks/useOnboardingHeaderActions';
 import { sliderConfigs, DimensionKey } from '@/lib/voiceConfig';
 import { toast } from 'sonner';
 
@@ -35,8 +35,8 @@ export const BrandVoiceScreen = () => {
     toast.info('Changes discarded');
   }, [cancel]);
 
-  // Register actions with header
-  useRegisterHeaderActions(hasChanges, isSaving, handleSave, handleCancel);
+  // Register actions with header (uses onboarding-aware hook for wizard flow)
+  useOnboardingHeaderActions(hasChanges, isSaving, handleSave, handleCancel);
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-6">

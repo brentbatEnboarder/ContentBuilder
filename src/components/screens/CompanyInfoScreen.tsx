@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import { Building2, Loader2, CheckCircle2, ExternalLink, Globe, Sparkles, FileText, Eye, Edit3, ImagePlus, X, Link2, Upload, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,7 @@ export const CompanyInfoScreen = () => {
     scannedPages,
     canScanMore,
     logoCandidates,
+    streamingDescription,
     updateDraft,
     save,
     cancel,
@@ -41,7 +42,15 @@ export const CompanyInfoScreen = () => {
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const descriptionRef = useRef<HTMLDivElement>(null);
   const { currentCustomer } = useCustomer();
+
+  // Auto-scroll description container when streaming
+  useEffect(() => {
+    if (streamingDescription && descriptionRef.current) {
+      descriptionRef.current.scrollTop = descriptionRef.current.scrollHeight;
+    }
+  }, [streamingDescription]);
 
   // Profile is active if a scan has been completed OR if there's existing data
   const hasScannedOrHasData = scannedPages.length > 0 || settings.name || settings.description;
@@ -418,8 +427,23 @@ export const CompanyInfoScreen = () => {
                 className="min-h-[350px] resize-y text-sm leading-relaxed font-mono"
                 autoFocus
               />
+            ) : streamingDescription ? (
+              /* Streaming extraction in progress */
+              <div
+                ref={descriptionRef}
+                className="min-h-[200px] max-h-[500px] overflow-y-auto p-4 bg-primary/5 rounded-lg border border-primary/20 prose prose-sm dark:prose-invert max-w-none relative"
+              >
+                <div className="absolute top-2 right-2 flex items-center gap-2 text-xs text-primary bg-background/80 px-2 py-1 rounded-full">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Extracting...</span>
+                </div>
+                <ReactMarkdown>{streamingDescription}</ReactMarkdown>
+              </div>
             ) : (
-              <div className="min-h-[200px] max-h-[500px] overflow-y-auto p-4 bg-muted/20 rounded-lg border border-border prose prose-sm dark:prose-invert max-w-none">
+              <div
+                ref={descriptionRef}
+                className="min-h-[200px] max-h-[500px] overflow-y-auto p-4 bg-muted/20 rounded-lg border border-border prose prose-sm dark:prose-invert max-w-none"
+              >
                 {settings.description ? (
                   <ReactMarkdown>{settings.description}</ReactMarkdown>
                 ) : (

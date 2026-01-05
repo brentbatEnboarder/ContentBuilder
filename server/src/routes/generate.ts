@@ -872,7 +872,7 @@ router.post('/images/stream', async (req: Request, res: Response) => {
     };
 
     console.log(
-      `[ImageGen] SSE Stream: Generating ${request.count} images with style: ${styleId}`
+      `[ImageGen] SSE Stream: Generating ${request.count} images with style: ${styleId}, aspectRatio: ${aspectRatio || 'default'}`
     );
     const startTime = Date.now();
 

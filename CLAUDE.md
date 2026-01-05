@@ -72,7 +72,7 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 - **`imageGen.ts`** - Gemini image generation
 - **`webSearch.ts`** - Brave Search API for web search tool
 - **`whisper.ts`** - OpenAI Whisper transcription
-- **`fileProcessor.ts`** - PDF/DOCX/TXT/PPTX processing
+- **`fileProcessor.ts`** - PDF/DOCX/TXT/MD/PPTX/XLSX processing with 50K char truncation
 
 ### Backend Routes (`/server/src/routes`)
 - **POST /api/scrape** - Basic website scraping (legacy)
@@ -96,7 +96,7 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 4. **Hook Migration** - All hooks use Supabase + React Query (not localStorage)
 5. **Chat Integration** - Real Claude API with SSE streaming
 6. **Image Generation** - Real Gemini API with conversational planning
-7. **File Processing** - PDF/DOCX/TXT extraction for chat attachments
+7. **File Processing** - PDF/DOCX/TXT/MD/PPTX/XLSX extraction for chat attachments with 50K char truncation
 8. **Error Handling** - Loading states, toast notifications on all screens
 9. **Intelligent Scraper** - Multi-page Claude-directed website scanning with real-time progress
 10. **Brand Colors** - 6-color palette (primary, secondary, accent, textColor, buttonBg, buttonFg) auto-extracted
@@ -188,6 +188,14 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 96. **Existing Customer Navigation** - Selecting existing customer lands on Pages screen instead of Company Info
 97. **Page Editor Key Fix** - Added React keys to force remount when switching between new/existing pages
 98. **Word Count Contrast** - Added darker teal-text color variant (35% lightness) for better readability
+99. **File Upload Fix** - Fixed critical bug where file content never reached Claude (only metadata was passed)
+100. **Excel Support** - Added XLSX processing with markdown table output (max 100 rows, 20 columns per sheet)
+101. **Content Truncation** - Files over 50K chars truncated with toast warning to user
+102. **SourceMaterial Type Fix** - Frontend now sends proper SourceMaterial objects (type, text, document, name) instead of strings
+103. **Markdown File Support** - Added .md file support using text/markdown MIME type
+104. **Full-Pane Drag-Drop** - Drop zone now covers entire ChatPane with overlay, not just input box
+105. **Document-Level Drop Prevention** - Browser no longer opens files dropped anywhere on page
+106. **Aspect Ratio Normalization** - Frontend normalizes AI-recommended aspect ratios (e.g., `2:1` → `21:9`) to valid API values, fixing image generation failures
 
 ## Environment Variables
 
@@ -326,6 +334,40 @@ The Edit modal (`InlineImageEditModal.tsx`) uses Gemini's vision capabilities:
 2. Chat-style input for edit instructions on right
 3. Suggestion chips for common modifications
 4. Edited image appears in chat, can then be selected
+
+### File Upload Architecture
+File attachments flow through the system as follows:
+
+1. **ChatInput.tsx** - User attaches files via button or drag-drop
+   - Stores `FileAttachment` metadata (id, name, type, size) for UI display
+   - Stores actual `File` objects in a `Map<string, File>` keyed by attachment ID
+   - Exposes `addFiles()` via `forwardRef` for parent drop zone
+
+2. **ChatPane.tsx** - Full-pane drag-drop zone
+   - Handles drag events over entire chat area
+   - Calls `chatInputRef.addFiles()` when files dropped
+   - Shows overlay during drag
+
+3. **PageEditorScreen.tsx** - Routes to correct handler
+   - If `files` array present: calls `sendMessageWithFiles(message, files)`
+   - Otherwise: calls `sendMessage(message, attachments)` (no file content)
+
+4. **useChat.ts `sendMessageWithFiles()`** - Processes files
+   - Calls `apiClient.processFile(file)` for each file
+   - Builds `SourceMaterial[]` objects: `{ type: 'text'|'document', text?, document?, name }`
+   - Shows toast warning if file was truncated
+   - Sends to backend with `sourceMaterials` in request
+
+5. **Backend `fileProcessor.ts`** - Extracts content
+   - PDF: Returns base64 for Claude's native document API
+   - DOCX/TXT/MD/PPTX/XLSX: Extracts text content
+   - Truncates text > 50K chars
+
+6. **Backend `claude.ts`** - Builds Claude request
+   - Text sources embedded in prompt under "## Source Materials"
+   - PDFs added as separate document content blocks
+
+**Supported file types:** PDF, DOCX, TXT, MD, PPTX, XLSX (max 10MB each)
 
 ### Chat Logging
 Full conversation transcripts are logged to the backend console for debugging:

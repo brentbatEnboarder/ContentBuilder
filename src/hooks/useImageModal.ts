@@ -21,6 +21,38 @@ interface ImageRecommendation {
   aspectRatio: string;
 }
 
+// Valid aspect ratios accepted by the image generation API
+const VALID_ASPECT_RATIOS = ['1:1', '16:9', '4:3', '3:2', '9:16', '21:9'] as const;
+
+/**
+ * Normalize aspect ratio from AI recommendations to valid API values.
+ * The AI may return values like '2:1' or '3:4' which the API doesn't accept.
+ */
+function normalizeAspectRatio(ratio: string | undefined, placementType: 'header' | 'body'): AspectRatio {
+  // Headers always use ultrawide
+  if (placementType === 'header') {
+    return '21:9';
+  }
+
+  // If no ratio provided, default to 16:9
+  if (!ratio) {
+    return '16:9';
+  }
+
+  // If already valid, return as-is
+  if (VALID_ASPECT_RATIOS.includes(ratio as typeof VALID_ASPECT_RATIOS[number])) {
+    return ratio as AspectRatio;
+  }
+
+  // Map AI's non-standard ratios to valid ones
+  const ratioMap: Record<string, AspectRatio> = {
+    '2:1': '21:9',   // Ultrawide
+    '3:4': '4:3',    // Flip to landscape (or could use 9:16 for portrait)
+  };
+
+  return ratioMap[ratio] || '16:9';
+}
+
 export function useImageModal(options: UseImageModalOptions = {}) {
   // Modal state machine
   const [modalState, setModalState] = useState<ImageModalState>('closed');
@@ -83,7 +115,7 @@ export function useImageModal(options: UseImageModalOptions = {}) {
         id: rec.id,
         type: rec.type,
         description: rec.description,
-        aspectRatio: (rec.type === 'header' ? '21:9' : rec.aspectRatio || '16:9') as AspectRatio,
+        aspectRatio: normalizeAspectRatio(rec.aspectRatio, rec.type),
         images: [
           { id: `${rec.id}-0`, url: '', isLoading: true },
           { id: `${rec.id}-1`, url: '', isLoading: true },
@@ -120,7 +152,7 @@ export function useImageModal(options: UseImageModalOptions = {}) {
               contentSummary: rec.description,
               styleId,
               brandColors,
-              aspectRatio: (rec.type === 'header' ? '21:9' : rec.aspectRatio) as AspectRatio,
+              aspectRatio: normalizeAspectRatio(rec.aspectRatio, rec.type),
               count: 3,
             },
             // onImage - called for each image as it completes

@@ -1,15 +1,14 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Plus, Mic, SendHorizontal, Link, ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { FileChip } from './FileChip';
-import { FileDropZone } from './FileDropZone';
 import { StyleDropdown } from '@/components/preview/StyleDropdown';
-import { useInputDetection, useFileDropzone } from '@/hooks/useInputDetection';
+import { useInputDetection } from '@/hooks/useInputDetection';
 import type { FileAttachment } from '@/types/page';
 
 interface ChatInputProps {
-  onSend: (message: string, attachments?: FileAttachment[]) => void;
+  onSend: (message: string, attachments?: FileAttachment[], files?: File[]) => void;
   disabled?: boolean;
   hasContent?: boolean;
   isGeneratingImages?: boolean;
@@ -18,9 +17,13 @@ interface ChatInputProps {
   onStyleChange?: () => void;
 }
 
+export interface ChatInputRef {
+  addFiles: (files: File[]) => void;
+}
+
 const generateFileId = () => `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-export const ChatInput = ({
+export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
   onSend,
   disabled,
   hasContent,
@@ -28,37 +31,70 @@ export const ChatInput = ({
   onGenerateImages,
   onNavigateToStyle,
   onStyleChange,
-}: ChatInputProps) => {
+}, ref) => {
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
+  // Store actual File objects keyed by attachment ID so we can send content to Claude
+  const [fileObjects, setFileObjects] = useState<Map<string, File>>(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { hasUrl } = useInputDetection(value);
-  const { isDragOver, handleDragEnter, handleDragLeave, handleDragOver, handleDrop } = useFileDropzone();
 
-  const handleFilesSelected = useCallback((files: File[]) => {
+  // Expose addFiles method for parent components (e.g., ChatPane drag-drop)
+  const addFilesInternal = useCallback((files: File[]) => {
     const newAttachments: FileAttachment[] = files.map(file => ({
       id: generateFileId(),
       name: file.name,
       type: file.type,
       size: file.size,
     }));
+
+    setFileObjects(prev => {
+      const next = new Map(prev);
+      newAttachments.forEach((att, i) => {
+        next.set(att.id, files[i]);
+      });
+      return next;
+    });
+
     setAttachments(prev => [...prev, ...newAttachments]);
   }, []);
 
+  useImperativeHandle(ref, () => ({
+    addFiles: addFilesInternal,
+  }), [addFilesInternal]);
+
+  // handleFilesSelected reuses addFilesInternal
+  const handleFilesSelected = addFilesInternal;
+
   const handleRemoveFile = useCallback((id: string) => {
     setAttachments(prev => prev.filter(f => f.id !== id));
+    setFileObjects(prev => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
   }, []);
 
   const handleSubmit = useCallback(() => {
     const trimmedValue = value.trim();
     if (!trimmedValue && attachments.length === 0) return;
 
-    onSend(trimmedValue, attachments.length > 0 ? attachments : undefined);
+    // Get File objects in the same order as attachments
+    const files = attachments
+      .map(att => fileObjects.get(att.id))
+      .filter((f): f is File => f !== undefined);
+
+    onSend(
+      trimmedValue,
+      attachments.length > 0 ? attachments : undefined,
+      files.length > 0 ? files : undefined
+    );
     setValue('');
     setAttachments([]);
-  }, [value, attachments, onSend]);
+    setFileObjects(new Map());
+  }, [value, attachments, fileObjects, onSend]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -80,17 +116,12 @@ export const ChatInput = ({
   return (
     <div
       className="relative bg-gradient-to-t from-slate-50 via-card to-card dark:from-slate-900 dark:via-card dark:to-card border-t border-border/50 px-4 pt-3 pb-4"
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={(e) => handleDrop(e, handleFilesSelected)}
     >
-      <FileDropZone isDragOver={isDragOver} />
 
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.doc,.docx,.txt,.pptx"
+        accept=".pdf,.docx,.txt,.md,.pptx,.xlsx"
         multiple
         onChange={handleFileInputChange}
         className="hidden"
@@ -226,4 +257,6 @@ export const ChatInput = ({
       )}
     </div>
   );
-};
+});
+
+ChatInput.displayName = 'ChatInput';

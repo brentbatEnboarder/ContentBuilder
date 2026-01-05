@@ -64,7 +64,7 @@ export interface ImageRecommendation {
   type: 'header' | 'body';
   title: string;
   description: string;
-  aspectRatio: '2:1' | '1:1' | '16:9' | '4:3' | '3:4' | '3:2';
+  aspectRatio: '21:9' | '1:1' | '16:9' | '4:3' | '3:2' | '9:16';
   placement: 'top' | 'bottom';
 }
 
@@ -549,16 +549,18 @@ Image Style: ${request.imageStyle || 'corporate'}
 Analyze the provided content and recommend images that would enhance it. You should:
 
 1. **Almost always recommend a header image** - This goes at the top of the content and sets the visual tone.
-   - Header images should use a 2:1 (panoramic) aspect ratio
+   - Header images should use a 21:9 (ultrawide/panoramic) aspect ratio
    - The title should be concise (3-6 words)
    - The description should capture the essence (1 sentence)
 
 2. **Recommend body images when appropriate** - Based on the content, you may recommend additional images.
    - Consider diagrams, illustrations, or photos that would break up the text
-   - Choose appropriate aspect ratios:
+   - Choose appropriate aspect ratios (ONLY use these exact values):
+     - 21:9 for ultrawide/panoramic (headers)
      - 16:9 for wide scenes
      - 4:3 for standard images
-     - 3:4 for portrait/tall content (diagrams, infographics)
+     - 3:2 for photos
+     - 9:16 for portrait/tall content (diagrams, infographics)
      - 1:1 for icons or square content
 
 ## Response Format
@@ -571,7 +573,7 @@ You MUST respond with a JSON block inside <image-plan> tags, followed by a conve
     "type": "header",
     "title": "Short descriptive title",
     "description": "Brief description of what the image should show",
-    "aspectRatio": "2:1",
+    "aspectRatio": "21:9",
     "placement": "top"
   },
   {

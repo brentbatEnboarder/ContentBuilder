@@ -53,7 +53,7 @@ export const CompanyInfoScreen = () => {
   }, [streamingDescription]);
 
   // Profile is active if a scan has been completed OR if there's existing data
-  const hasScannedOrHasData = scannedPages.length > 0 || settings.name || settings.description;
+  const hasScannedOrHasData = scannedPages.length > 0 || !!settings.name || !!settings.description;
 
   const handleSave = useCallback(async () => {
     try {
@@ -71,7 +71,8 @@ export const CompanyInfoScreen = () => {
   }, [cancel]);
 
   // Register actions with header (uses onboarding-aware hook for wizard flow)
-  useOnboardingHeaderActions(hasChanges, isSaving, handleSave, handleCancel);
+  // For step 1, canProceed is only true after scan completes (company info exists)
+  useOnboardingHeaderActions(hasChanges, isSaving, handleSave, handleCancel, hasScannedOrHasData);
 
   const handleScan = async () => {
     await scanUrl();
@@ -391,6 +392,11 @@ export const CompanyInfoScreen = () => {
             <div className="flex items-center gap-2 mb-3">
               <FileText className="w-4 h-4 text-primary" />
               <Label className="text-sm font-medium">Company Description</Label>
+              {settings.description && (
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                  {settings.description.trim().split(/\s+/).filter(Boolean).length.toLocaleString()} words
+                </span>
+              )}
               <div className="ml-auto">
                 {isEditingDescription ? (
                   <Button
@@ -428,16 +434,26 @@ export const CompanyInfoScreen = () => {
                 autoFocus
               />
             ) : streamingDescription ? (
-              /* Streaming extraction in progress */
+              /* Streaming extraction in progress - show progress indicator */
               <div
                 ref={descriptionRef}
-                className="min-h-[200px] max-h-[500px] overflow-y-auto p-4 bg-primary/5 rounded-lg border border-primary/20 prose prose-sm dark:prose-invert max-w-none relative"
+                className="min-h-[200px] max-h-[500px] overflow-y-auto p-4 bg-primary/5 rounded-lg border border-primary/20 relative flex flex-col items-center justify-center"
               >
-                <div className="absolute top-2 right-2 flex items-center gap-2 text-xs text-primary bg-background/80 px-2 py-1 rounded-full">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>Extracting...</span>
+                <div className="flex flex-col items-center gap-4">
+                  <div className="relative">
+                    <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                    <Sparkles className="w-4 h-4 text-primary absolute -top-1 -right-1 animate-pulse" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-foreground">AI is analyzing company information...</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Extracting details from {scannedPages.length} pages
+                    </p>
+                  </div>
+                  <div className="text-xs text-primary bg-primary/10 px-3 py-1 rounded-full">
+                    ~{streamingDescription.trim().split(/\s+/).filter(Boolean).length.toLocaleString()} words extracted
+                  </div>
                 </div>
-                <ReactMarkdown>{streamingDescription}</ReactMarkdown>
               </div>
             ) : (
               <div

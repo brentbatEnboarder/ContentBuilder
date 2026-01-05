@@ -160,9 +160,18 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 68. **Enhanced Content Extraction** - 2000-4000 word descriptions with verbatim content preservation
 69. **Parallel Page Scraping** - 5 concurrent Firecrawl requests (matches plan limit), ~4x faster scraping
 70. **Image Proxy Endpoint** - `/api/image-proxy` bypasses CORS for external logo thumbnails
-71. **Streaming Extraction** - Claude extraction streams in real-time with Haiku (faster than Sonnet)
+71. **Streaming Extraction** - Claude Sonnet extraction with progress indicator (switched from Haiku for better quality)
 72. **Immediate Logo Display** - Logo appears during scan before extraction completes
 73. **Logo Priority Change** - Brave search result used first, og:image as fallback only
+74. **URL Prioritization** - Scraper sorts URLs by relevance (careers/about/team first) before 100-URL limit
+75. **Sibling Domain Support** - Scraper includes URLs from related domains (e.g., .co.nz accepts .com.au)
+76. **HTTP/HTTPS Normalization** - Scraper compares hostnames not origins (fixes Firecrawl http:// URLs)
+77. **JSON Sanitization** - Extraction handles unescaped newlines in Claude's JSON responses
+78. **Description Word Count** - Company description shows word count badge, updates during streaming
+79. **Wizard Banner Save Button** - "Save & Next" button moved from header to wizard banner during onboarding
+80. **Step 1 Mandatory Scan** - "Save & Next" hidden on Company Info until scan completes
+81. **Brand Voice 50/50 Layout** - Voice dimensions and live preview now equal width columns
+82. **Live Preview Enhancement** - Example text larger and bold with quotation marks
 
 ## Environment Variables
 
@@ -342,10 +351,11 @@ The intelligent scraper (`/api/scrape/intelligent`) uses SSE streaming with opti
 9. Frontend displays logo before extraction completes
 
 **Phase 5b: Streaming Extraction**
-10. Uses **Claude Haiku** (faster than Sonnet) with streaming API
+10. Uses **Claude Sonnet** (better quality than Haiku for long-form content)
 11. `extraction_chunk` events stream as Claude generates
-12. Frontend can show real-time extraction progress
+12. Frontend shows progress indicator with live word count during extraction
 13. Extracts comprehensive company info (**1500-2500 words**, markdown formatted) + 6 brand colors
+14. JSON sanitization handles unescaped newlines in markdown content
 
 **SSE Event Types:**
 ```
@@ -410,13 +420,15 @@ New customers go through a 4-step wizard before accessing the full app:
 
 **Components:**
 - `OnboardingContext` - Tracks `currentStep`, `completedSteps`, `isOnboarding` state
-- `WizardBanner` - Progress dots, step info, Back button (appears below TopHeader)
-- `useOnboardingHeaderActions` - Wraps save to advance through wizard
+- `WizardBanner` - Progress dots, step info, Back button, "Save & Next" button (appears below TopHeader)
+- `useOnboardingHeaderActions` - Wraps save to advance through wizard, accepts `canProceed` parameter
 
 **Behavior:**
 - `onboarding_completed` boolean in `customer_settings` table
 - Existing customers auto-marked as completed
-- "Save & Next" button replaces "Save" during wizard
+- "Save & Next" button appears in wizard banner (not header) during onboarding
+- **Step 1 (Company Info)**: Button hidden until website scan completes (mandatory)
+- **Steps 2-3**: Button always visible (no mandatory changes required)
 - Left nav shows checkmarks on completed steps, disables future steps
 - After step 3, marks `onboarding_completed = true` and opens page editor
 

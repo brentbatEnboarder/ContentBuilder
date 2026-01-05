@@ -56,8 +56,8 @@ export const VoiceInfoBox = ({ activeKey, value }: VoiceInfoBoxProps) => {
         <p className="text-xs font-medium text-muted-foreground mb-2 ml-5">
           Example
         </p>
-        <p className="text-sm text-foreground italic leading-relaxed ml-5">
-          {valueData.example}
+        <p className="text-base font-semibold text-foreground leading-relaxed ml-5">
+          "{valueData.example}"
         </p>
       </div>
     </div>

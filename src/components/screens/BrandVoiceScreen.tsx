@@ -40,8 +40,8 @@ export const BrandVoiceScreen = () => {
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-6">
-      {/* Top Section - Sliders and Info Box side by side */}
-      <div className="grid grid-cols-[1fr_320px] gap-6">
+      {/* Top Section - Sliders and Info Box side by side (50/50) */}
+      <div className="grid grid-cols-2 gap-6">
         {/* Sliders Card - Left */}
         <div className="bg-card rounded-2xl border border-border shadow-md overflow-hidden">
           {/* Card Header */}

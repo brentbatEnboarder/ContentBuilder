@@ -1,6 +1,8 @@
-import { Check, ChevronLeft } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { useOnboarding, ONBOARDING_STEPS } from '@/contexts/OnboardingContext';
+import { useHeaderActions } from '@/contexts/HeaderActionsContext';
 
 export const WizardBanner = () => {
   const {
@@ -11,8 +13,12 @@ export const WizardBanner = () => {
     isStepCompleted,
     isStepCurrent,
   } = useOnboarding();
+  const { actions } = useHeaderActions();
 
   if (!isOnboarding) return null;
+
+  // Only show Save & Next for setup steps (1-3), not step 4 (first page)
+  const isSetupStep = ['company', 'voice', 'style'].includes(currentStep);
 
   const stepInfo = ONBOARDING_STEPS.find((s) => s.step === currentStep);
   const currentIndex = ONBOARDING_STEPS.findIndex((s) => s.step === currentStep);
@@ -31,7 +37,7 @@ export const WizardBanner = () => {
       <div className="max-w-5xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           {/* Left: Back button (hidden on first step) */}
-          <div className="w-20">
+          <div className="w-32">
             {!isFirstStep && (
               <button
                 onClick={previousStep}
@@ -90,8 +96,29 @@ export const WizardBanner = () => {
             </div>
           </div>
 
-          {/* Right: Spacer for balance */}
-          <div className="w-20" />
+          {/* Right: Save & Next button */}
+          <div className="w-32 flex justify-end">
+            {isSetupStep && actions && (
+              <Button
+                size="sm"
+                onClick={actions.onSave}
+                disabled={actions.isSaving}
+                className="gap-1.5 shadow-md"
+              >
+                {actions.isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    Save & Next
+                    <ChevronRight className="w-4 h-4" />
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

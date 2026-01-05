@@ -130,6 +130,60 @@ function normalizeUrl(url: string): string {
   }
 }
 
+/**
+ * Sanitize JSON string by escaping control characters inside string values.
+ * Claude sometimes returns JSON with unescaped newlines/tabs in markdown content.
+ */
+function sanitizeJsonString(jsonStr: string): string {
+  // This regex finds string values and escapes control characters within them
+  // It handles the case where Claude returns multi-line markdown in JSON strings
+  let result = '';
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < jsonStr.length; i++) {
+    const char = jsonStr[i];
+
+    if (escape) {
+      result += char;
+      escape = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      result += char;
+      escape = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      result += char;
+      continue;
+    }
+
+    if (inString) {
+      // Escape control characters inside strings
+      if (char === '\n') {
+        result += '\\n';
+      } else if (char === '\r') {
+        result += '\\r';
+      } else if (char === '\t') {
+        result += '\\t';
+      } else if (char.charCodeAt(0) < 32) {
+        // Other control characters - escape as unicode
+        result += '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0');
+      } else {
+        result += char;
+      }
+    } else {
+      result += char;
+    }
+  }
+
+  return result;
+}
+
 // ============================================================================
 // Main Intelligent Scraper
 // ============================================================================
@@ -170,21 +224,56 @@ export async function* intelligentScrape(
       includeSubdomains: false,
     });
 
+    console.log(`[Scraper] Map result keys:`, Object.keys(mapResult || {}));
+
     // Extract URLs from map result
     if (mapResult.links && Array.isArray(mapResult.links)) {
-      allLinks = mapResult.links
-        .map((link: string | { url: string }) => typeof link === 'string' ? link : link.url)
-        .filter((link: string) => {
-          try {
-            const linkUrl = new URL(link, baseUrl);
-            // Only keep internal links
-            return linkUrl.origin === baseUrl;
-          } catch {
-            return false;
-          }
-        });
+      const rawLinks = mapResult.links.map((link: string | { url: string }) =>
+        typeof link === 'string' ? link : link.url
+      );
+      console.log(`[Scraper] Map returned ${rawLinks.length} raw URLs`);
 
-      console.log(`[Scraper] Map discovered ${allLinks.length} URLs on the site`);
+      // Extract the base company domain (e.g., "downergroup" from "www.downergroup.co.nz")
+      const getBaseDomain = (hostname: string): string => {
+        const parts = hostname.replace(/^www\./, '').split('.');
+        // Handle common TLDs: .com, .co.nz, .com.au, etc.
+        if (parts.length >= 3 && (parts[parts.length - 2] === 'co' || parts[parts.length - 2] === 'com')) {
+          return parts[parts.length - 3]; // e.g., "downergroup" from "downergroup.co.nz"
+        }
+        return parts.length >= 2 ? parts[parts.length - 2] : parts[0];
+      };
+
+      const baseHostname = new URL(baseUrl).hostname;
+      const baseDomain = getBaseDomain(baseHostname);
+      console.log(`[Scraper] Base domain extracted: "${baseDomain}" from "${baseHostname}"`);
+
+      // Count URLs by origin to understand the distribution
+      const originCounts: Record<string, number> = {};
+      rawLinks.forEach((link: string) => {
+        try {
+          const linkUrl = new URL(link, baseUrl);
+          originCounts[linkUrl.origin] = (originCounts[linkUrl.origin] || 0) + 1;
+        } catch {
+          originCounts['invalid'] = (originCounts['invalid'] || 0) + 1;
+        }
+      });
+      console.log(`[Scraper] URL origins distribution:`, originCounts);
+
+      // Filter to include sibling domains (same company, different region)
+      // Note: Compare hostnames, not origins - Firecrawl may return http:// URLs for https:// sites
+      allLinks = rawLinks.filter((link: string) => {
+        try {
+          const linkUrl = new URL(link, baseUrl);
+          const linkDomain = getBaseDomain(linkUrl.hostname);
+          // Allow exact hostname match OR sibling domains (same base company name)
+          const isRelated = linkUrl.hostname === baseHostname || linkDomain === baseDomain;
+          return isRelated;
+        } catch {
+          return false;
+        }
+      });
+
+      console.log(`[Scraper] Map discovered ${allLinks.length} related URLs (including sibling domains)`);
 
       // Log any careers-related URLs found
       const careerUrls = allLinks.filter((url: string) => {
@@ -509,7 +598,7 @@ async function identifyPagesToScrape(
   maxPages: number
 ): Promise<PageToScrape[]> {
   // Deduplicate and clean links
-  const uniqueLinks = [...new Set(links)]
+  const filteredLinks = [...new Set(links)]
     .filter((link) => {
       const lower = link.toLowerCase();
       // Filter out common non-content pages
@@ -526,8 +615,42 @@ async function identifyPagesToScrape(
              !lower.includes('.pdf') &&
              !lower.includes('.jpg') &&
              !lower.includes('.png');
-    })
-    .slice(0, 100); // Limit to 100 links for Claude
+    });
+
+  // Prioritize relevant URLs before slicing - ensures careers/about/team pages aren't cut off
+  const priorityPatterns = [
+    // Highest priority - careers related (various naming conventions)
+    /\/(career|careers|jobs?|work-with|join-us|join|opportunities|hiring|employment)/i,
+    /\/(people-and-career|people-and-careers|working-at|life-at|work-here)/i,
+    // High priority - about/company info
+    /\/(about|about-us|our-story|who-we-are|company|overview)/i,
+    /\/(team|people|our-team|leadership|our-people|meet-the-team)/i,
+    /\/(culture|our-culture|benefits|perks)/i,
+    /\/(values|our-values|mission|vision)/i,
+    /\/(history|our-history|our-journey|founding)/i,
+    /\/(diversity|inclusion|belonging|dei)/i,
+    // Medium priority - services/products overview
+    /\/(services?|what-we-do|solutions|products?)$/i,
+    /\/(sustainability|environment|safety)/i,
+  ];
+
+  const prioritized = filteredLinks.sort((a, b) => {
+    const getPriority = (url: string): number => {
+      for (let i = 0; i < priorityPatterns.length; i++) {
+        if (priorityPatterns[i].test(url)) return i;
+      }
+      // Deprioritize news/dated content
+      if (/\/\d{4}\/|\/news\/|\/blog\/|\/media\/|\/press\//.test(url)) return 100;
+      return 50; // Default priority
+    };
+    return getPriority(a) - getPriority(b);
+  });
+
+  // Now slice to 100 - prioritized URLs will be at the front
+  const uniqueLinks = prioritized.slice(0, 100);
+
+  console.log(`[Scraper] Filtered ${links.length} → ${filteredLinks.length} URLs, prioritized top 100`);
+  console.log(`[Scraper] Top 20 prioritized URLs:`, uniqueLinks.slice(0, 20));
 
   const prompt = `You are analyzing a company website to gather comprehensive information for employee onboarding content generation.
 
@@ -597,10 +720,21 @@ Return ONLY the JSON array, no other text.`;
 
     // Parse JSON response
     const jsonMatch = content.text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return [];
+    if (!jsonMatch) {
+      console.error('[Scraper] Claude did not return valid JSON for page identification');
+      console.error('[Scraper] Claude response:', content.text.slice(0, 500));
+      return [];
+    }
 
     const pages: PageToScrape[] = JSON.parse(jsonMatch[0]);
-    return pages.sort((a, b) => b.priority - a.priority);
+    const sortedPages = pages.sort((a, b) => b.priority - a.priority);
+
+    console.log(`[Scraper] Claude identified ${sortedPages.length} relevant pages:`);
+    sortedPages.forEach((p, i) => {
+      console.log(`  ${i + 1}. [P${p.priority}] ${p.reason}: ${p.url}`);
+    });
+
+    return sortedPages;
 
   } catch (error) {
     console.error('Failed to identify pages:', error);
@@ -808,22 +942,46 @@ Extract the following information and return as JSON:
 
 2. "industry": The industry/sector they operate in (be specific, e.g., "HR Technology / Employee Experience Software" not just "Technology")
 
-3. "description": A COMPREHENSIVE description that will help generate excellent onboarding content. This should be **1500-2500 words** and cover:
+3. "description": A COMPREHENSIVE description that will help generate excellent onboarding content.
 
-   **IMPORTANT: Preserve verbatim content whenever possible!**
-   - DO NOT summarize or compress quotes, testimonials, or specific language from the source
-   - Preserve employee quotes, mission statements, and value descriptions word-for-word
-   - Include full descriptions of programs, benefits, and initiatives
+   **CRITICAL: This description MUST be 1500-2500 words minimum. Do NOT summarize or abbreviate.**
 
-   **Sections to include:**
-   - Company Overview (what they do, who they serve, market position)
-   - Mission, Vision & Values (quote verbatim if available)
-   - Culture & Workplace (work environment, benefits, DEI initiatives)
-   - People & Leadership (founder story, leadership team)
-   - Career & Growth (development opportunities, testimonials)
-   - History & Achievements (founding story, milestones)
+   This is the primary source of context for AI-generated onboarding content, so longer and more detailed is better. Include ALL of the following sections with substantial detail:
 
-   Format using **markdown** with ## headings, **bold**, bullet points, and > blockquotes.
+   ## Company Overview
+   - What the company does and who they serve
+   - Products, services, and market position
+   - Size, locations, and global presence
+
+   ## Mission, Vision & Values
+   - Quote mission statements VERBATIM
+   - List ALL values with their full descriptions
+   - Include any guiding principles
+
+   ## Culture & Workplace
+   - Work environment and team dynamics
+   - Employee benefits and perks (list ALL mentioned)
+   - DEI initiatives and programs
+   - What makes it unique to work here
+
+   ## People & Leadership
+   - Founder story and company origins
+   - Leadership team backgrounds
+   - Notable people or roles
+
+   ## Career & Growth
+   - Development and learning opportunities
+   - Why people join and stay
+   - Employee testimonials (quote VERBATIM)
+
+   ## History & Achievements
+   - Founding story and key milestones
+   - Awards and recognition
+   - Future direction and goals
+
+   Format using **markdown** with ## headings, **bold**, bullet points, and > blockquotes for quotes.
+
+   **REMEMBER: Aim for 1500-2500 words. More detail is always better than less.**
 
 4. "logo": If you find a logo URL in the content, include it. Otherwise null.
 
@@ -833,10 +991,10 @@ Extract the following information and return as JSON:
 Return ONLY valid JSON, no other text.`;
 
   try {
-    // Use Haiku for faster streaming extraction
+    // Use Sonnet for higher quality extraction (Haiku produces shorter outputs)
     const stream = await claude.messages.stream({
-      model: 'claude-3-5-haiku-20241022',
-      max_tokens: 8000,
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 16000,
       messages: [{ role: 'user', content: prompt }],
     });
 
@@ -854,8 +1012,16 @@ Return ONLY valid JSON, no other text.`;
     const jsonMatch = fullText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
-        const extracted = JSON.parse(jsonMatch[0]);
+        // Sanitize JSON: escape control characters inside string values
+        // This handles cases where Claude returns unescaped newlines in markdown content
+        const sanitizedJson = sanitizeJsonString(jsonMatch[0]);
+        const extracted = JSON.parse(sanitizedJson);
         const colors = extracted.suggestedColors || {};
+
+        // Log extraction success with description stats
+        const descLength = extracted.description?.length || 0;
+        const wordCount = extracted.description?.split(/\s+/).length || 0;
+        console.log(`[Scraper] Extraction successful: ${descLength} chars, ~${wordCount} words`);
         yield {
           type: 'complete',
           result: {
@@ -875,6 +1041,7 @@ Return ONLY valid JSON, no other text.`;
         };
       } catch (parseError) {
         console.error('Failed to parse streaming extraction JSON:', parseError);
+        console.error('Raw JSON (first 500 chars):', jsonMatch[0].slice(0, 500));
         yield { type: 'complete', result: getDefaultExtraction(url) };
       }
     } else {

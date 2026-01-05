@@ -151,7 +151,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
           }));
 
         // Build request with current settings
-        console.log('[useChat] Sending request with imageStyle:', effectiveImageStyle);
+        console.log('[useChat] Sending request with imageStyle:', effectiveImageStyle, 'targetWordLength:', styleSettings.targetWordLength);
         const request = {
           objective: content,
           companyProfile: buildCompanyProfile(),
@@ -162,6 +162,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
             enthusiasm: voiceSettings.enthusiasm,
           },
           imageStyle: effectiveImageStyle,
+          targetWordLength: styleSettings.targetWordLength,
           sourceMaterials,
           currentContent: currentContent || undefined,
           conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
@@ -330,7 +331,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
         );
       }
     },
-    [companySettings, voiceSettings, effectiveImageStyle, onContentGenerated, onContentStreaming, onTitleSuggested, currentContent, currentTitle]
+    [companySettings, voiceSettings, styleSettings, effectiveImageStyle, onContentGenerated, onContentStreaming, onTitleSuggested, currentContent, currentTitle]
   );
 
   /**
@@ -400,6 +401,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
             enthusiasm: voiceSettings.enthusiasm,
           },
           imageStyle: effectiveImageStyle,
+          targetWordLength: styleSettings.targetWordLength,
           sourceMaterials: sourceMaterials.length > 0 ? sourceMaterials : undefined,
           currentContent: currentContent || undefined,
         };
@@ -496,7 +498,7 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
         );
       }
     },
-    [companySettings, voiceSettings, effectiveImageStyle, onContentGenerated, onContentStreaming, onTitleSuggested, currentContent, currentTitle]
+    [companySettings, voiceSettings, styleSettings, effectiveImageStyle, onContentGenerated, onContentStreaming, onTitleSuggested, currentContent, currentTitle]
   );
 
   const addSystemMessage = useCallback((content: string) => {

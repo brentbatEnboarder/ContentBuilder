@@ -43,6 +43,7 @@ export interface GenerateContentRequest {
   companyProfile: CompanyProfile;
   voiceSettings: VoiceSettings;
   imageStyle?: string;
+  targetWordLength?: number; // Target length for generated content in words
   sourceMaterials?: SourceMaterial[];
   feedback?: string; // For regeneration with user feedback
   currentContent?: string; // Previously generated content for context
@@ -122,9 +123,16 @@ ${voiceInstructions.join('\n\n')}`;
  */
 export function buildSystemPrompt(
   companyProfile: CompanyProfile,
-  voiceSettings: VoiceSettings
+  voiceSettings: VoiceSettings,
+  targetWordLength?: number
 ): string {
   const voicePrompt = buildVoicePrompt(voiceSettings);
+
+  // Build target length guidance if provided
+  const lengthGuidance = targetWordLength
+    ? `\n\n## Content Length
+Generate content that is approximately **${targetWordLength} words** in length. This is a target, not a hard limit - prioritize quality and completeness over hitting the exact word count. If the content naturally requires more or fewer words to be effective, that's acceptable.`
+    : '';
 
   return `You are an expert content writer for Enboarder, a platform that creates employee journey content (onboarding, offboarding, transitions, etc.).
 
@@ -185,7 +193,7 @@ IMPORTANT:
 4. Include calls-to-action where appropriate
 5. Maintain the specified voice characteristics throughout
 6. Reference company values and culture when relevant
-7. Make content feel personal and welcoming`;
+7. Make content feel personal and welcoming${lengthGuidance}`;
 }
 
 /**
@@ -276,7 +284,8 @@ export async function generateContent(
 
   const systemPrompt = buildSystemPrompt(
     request.companyProfile,
-    request.voiceSettings
+    request.voiceSettings,
+    request.targetWordLength
   );
 
   // Build message content (may include document blocks for PDFs)
@@ -345,7 +354,8 @@ export async function* generateContentStream(
 
   const systemPrompt = buildSystemPrompt(
     request.companyProfile,
-    request.voiceSettings
+    request.voiceSettings,
+    request.targetWordLength
   );
 
   // Build message content (may include document blocks for PDFs)
@@ -966,7 +976,8 @@ export async function* generateContentStreamWithTools(
 
   const systemPrompt = buildSystemPrompt(
     request.companyProfile,
-    request.voiceSettings
+    request.voiceSettings,
+    request.targetWordLength
   );
 
   // Build message content for the current user message

@@ -55,7 +55,7 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 - **`usePages.ts`** - CRUD for pages table
 - **`useCompanySettings.ts`** - Company info with intelligent URL scanning, brand colors, logo candidates
 - **`useVoiceSettings.ts`** - Voice dimension sliders (formality, humor, respect, enthusiasm)
-- **`useStyleSettings.ts`** - Image style selection
+- **`useStyleSettings.ts`** - Image style selection + target word length (auto-saves)
 - **`useChat.ts`** - Chat with streaming Claude API
 - **`useImageGeneration.ts`** - Gemini image generation
 - **`useImagePlanning.ts`** - Conversational image planning with AI recommendations
@@ -172,6 +172,8 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 80. **Step 1 Mandatory Scan** - "Save & Next" hidden on Company Info until scan completes
 81. **Brand Voice 50/50 Layout** - Voice dimensions and live preview now equal width columns
 82. **Live Preview Enhancement** - Example text larger and bold with quotation marks
+83. **Target Word Length Control** - User-configurable target (default 300 words) with ±25% Shorter/Longer 3D buttons, auto-saves per customer
+84. **Preview Toolbar Redesign** - Word count pill, compact 3D target controls aligned with input, 3D regenerate button moved left
 
 ## Environment Variables
 

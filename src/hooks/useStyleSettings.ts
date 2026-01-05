@@ -15,10 +15,12 @@ export type ImageStyleType =
 
 export interface StyleSettings {
   selectedStyle: ImageStyleType;
+  targetWordLength: number;
 }
 
 const defaultSettings: StyleSettings = {
   selectedStyle: 'flat',
+  targetWordLength: 300,
 };
 
 export const useStyleSettings = () => {
@@ -59,10 +61,15 @@ export const useStyleSettings = () => {
     }
   }, [savedSettings]);
 
-  // Check if draft differs from saved
+  // Check if draft differs from saved (only check selectedStyle for Visual Style screen save button)
   const hasChanges = savedSettings
     ? draft.selectedStyle !== savedSettings.selectedStyle
     : false;
+
+  // Merge saved settings with defaults to handle missing fields
+  const mergedSettings = savedSettings
+    ? { ...defaultSettings, ...savedSettings }
+    : defaultSettings;
 
   // Mutation: Save settings to Supabase
   const saveMutation = useMutation({
@@ -108,8 +115,31 @@ export const useStyleSettings = () => {
 
   // Select a style in draft
   const selectStyle = useCallback((style: ImageStyleType) => {
-    setDraft({ selectedStyle: style });
+    setDraft((prev) => ({ ...prev, selectedStyle: style }));
   }, []);
+
+  // Set target word length and auto-save immediately
+  const setTargetWordLength = useCallback(
+    async (length: number) => {
+      // Clamp to reasonable bounds
+      const clampedLength = Math.max(50, Math.min(5000, Math.round(length)));
+      const newSettings = { ...draft, targetWordLength: clampedLength };
+      setDraft(newSettings);
+      // Auto-save immediately
+      await saveMutation.mutateAsync(newSettings);
+    },
+    [draft, saveMutation]
+  );
+
+  // Adjust target by percentage (for shorter/longer buttons)
+  const adjustTargetLength = useCallback(
+    async (multiplier: number) => {
+      const currentTarget = draft.targetWordLength || defaultSettings.targetWordLength;
+      const newTarget = Math.round(currentTarget * multiplier);
+      await setTargetWordLength(newTarget);
+    },
+    [draft.targetWordLength, setTargetWordLength]
+  );
 
   // Save draft to Supabase
   const save = useCallback(async () => {
@@ -123,18 +153,16 @@ export const useStyleSettings = () => {
     }
   }, [savedSettings]);
 
-  // Use savedSettings as the primary value (shared via React Query cache)
-  // This ensures all hook instances see the same value immediately after save
-  const currentSettings = savedSettings || defaultSettings;
-
   return {
-    settings: currentSettings, // Changed: use cached value, not local draft
-    savedSettings: currentSettings,
+    settings: { ...defaultSettings, ...draft }, // Merge with defaults to ensure all fields exist
+    savedSettings: mergedSettings,
     isLoading,
     isSaving: saveMutation.isPending,
     hasChanges,
     error: error as Error | null,
     selectStyle,
+    setTargetWordLength,
+    adjustTargetLength,
     save,
     cancel,
   };

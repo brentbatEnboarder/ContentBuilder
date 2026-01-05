@@ -9,6 +9,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { VoiceDropdown } from './VoiceDropdown';
+import { TargetLengthControl } from './TargetLengthControl';
+import { useStyleSettings } from '@/hooks/useStyleSettings';
 import { toast } from 'sonner';
 import type { ContentBlock } from '@/types/content';
 import {
@@ -41,6 +43,7 @@ export const PreviewToolbar = ({
   images = [],
 }: PreviewToolbarProps) => {
   const [isDownloading, setIsDownloading] = useState(false);
+  const { settings: styleSettings, setTargetWordLength, adjustTargetLength } = useStyleSettings();
 
   // Calculate word count (split on whitespace, filter empty strings)
   const wordCount = content.trim()
@@ -121,15 +124,64 @@ export const PreviewToolbar = ({
     }
   };
 
+  // 3D regenerate button styles (matching shorter/longer)
+  const regenerateButtonClasses = `
+    flex items-center justify-center gap-1.5 px-3 h-[42px] rounded-lg
+    bg-gradient-to-b from-white to-slate-100
+    dark:from-slate-700 dark:to-slate-800
+    border border-slate-200/80 dark:border-slate-600
+    shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.8)]
+    dark:shadow-[0_1px_3px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)]
+    hover:from-slate-50 hover:to-slate-100 hover:border-slate-300
+    hover:shadow-[0_2px_4px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]
+    dark:hover:from-slate-600 dark:hover:to-slate-700
+    active:from-slate-100 active:to-slate-150 active:shadow-[inset_0_1px_3px_rgba(0,0,0,0.1)]
+    dark:active:from-slate-750 dark:active:to-slate-800
+    transition-all duration-100 ease-out
+    disabled:opacity-40 disabled:cursor-not-allowed
+  `;
+
   return (
-    <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
+    <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2">
       <div className="flex items-center gap-3">
         <VoiceDropdown onNavigateToSettings={onNavigateToVoice} />
+
+        {/* Word count pill */}
         {hasContent && (
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {wordCount.toLocaleString()} {wordCount === 1 ? 'word' : 'words'}
-          </span>
+          <div className="flex items-center px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300 tabular-nums">
+              {wordCount.toLocaleString()}
+            </span>
+            <span className="text-xs text-slate-400 dark:text-slate-500 ml-1">
+              {wordCount === 1 ? 'word' : 'words'}
+            </span>
+          </div>
         )}
+
+        <div className="w-px h-8 bg-border" />
+
+        <TargetLengthControl
+          value={styleSettings.targetWordLength}
+          onChange={setTargetWordLength}
+          onAdjust={adjustTargetLength}
+          disabled={isGenerating}
+        />
+
+        {/* Regenerate button - 3D style */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={onRegenerate}
+              disabled={!hasContent || isGenerating}
+              className={regenerateButtonClasses}
+            >
+              <RotateCw className={`w-3.5 h-3.5 text-slate-500 dark:text-slate-400 ${isGenerating ? 'animate-spin' : ''}`} strokeWidth={2.5} />
+              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Regenerate</span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Regenerate content</TooltipContent>
+        </Tooltip>
       </div>
 
       <div className="flex items-center gap-1">
@@ -200,21 +252,6 @@ export const PreviewToolbar = ({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={onRegenerate}
-              disabled={!hasContent || isGenerating}
-            >
-              <RotateCw className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Regenerate</TooltipContent>
-        </Tooltip>
       </div>
     </div>
   );

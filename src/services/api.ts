@@ -68,6 +68,7 @@ export interface GenerateTextRequest {
   companyProfile: CompanyProfile;
   voiceSettings: VoiceSettings;
   imageStyle?: string;
+  targetWordLength?: number;
   sourceMaterials?: string[];
   feedback?: string;
   stream?: boolean;

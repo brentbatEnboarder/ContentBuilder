@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Copy, Download, RotateCw, Loader2 } from 'lucide-react';
+import { Copy, Download, RotateCw, Loader2, FileText, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -124,42 +124,28 @@ export const PreviewToolbar = ({
     }
   };
 
-  // 3D regenerate button styles (matching shorter/longer)
-  const regenerateButtonClasses = `
-    flex items-center justify-center gap-1.5 px-3 h-[42px] rounded-lg
-    bg-gradient-to-b from-white to-slate-100
-    dark:from-slate-700 dark:to-slate-800
-    border border-slate-200/80 dark:border-slate-600
-    shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.8)]
-    dark:shadow-[0_1px_3px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)]
-    hover:from-slate-50 hover:to-slate-100 hover:border-slate-300
-    hover:shadow-[0_2px_4px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]
-    dark:hover:from-slate-600 dark:hover:to-slate-700
-    active:from-slate-100 active:to-slate-150 active:shadow-[inset_0_1px_3px_rgba(0,0,0,0.1)]
-    dark:active:from-slate-750 dark:active:to-slate-800
-    transition-all duration-100 ease-out
-    disabled:opacity-40 disabled:cursor-not-allowed
-  `;
-
   return (
-    <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2">
-      <div className="flex items-center gap-3">
+    <div className="flex items-center justify-between border-b border-border/50 bg-gradient-to-r from-card via-card to-slate-50/50 dark:to-slate-900/50 px-4 py-2.5">
+      {/* Left section: Voice & Word Count */}
+      <div className="flex items-center gap-2">
         <VoiceDropdown onNavigateToSettings={onNavigateToVoice} />
 
-        {/* Word count pill */}
+        {/* Word count badge with teal accent */}
         {hasContent && (
-          <div className="flex items-center px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-300 tabular-nums">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-teal/10 border border-teal/20">
+            <FileText className="w-3 h-3 text-teal" />
+            <span className="text-xs font-semibold text-teal tabular-nums">
               {wordCount.toLocaleString()}
             </span>
-            <span className="text-xs text-slate-400 dark:text-slate-500 ml-1">
+            <span className="text-xs text-teal/70">
               {wordCount === 1 ? 'word' : 'words'}
             </span>
           </div>
         )}
+      </div>
 
-        <div className="w-px h-8 bg-border" />
-
+      {/* Center section: Target Length Controls */}
+      <div className="flex items-center gap-3">
         <TargetLengthControl
           value={styleSettings.targetWordLength}
           onChange={setTargetWordLength}
@@ -167,34 +153,51 @@ export const PreviewToolbar = ({
           disabled={isGenerating}
         />
 
-        {/* Regenerate button - 3D style */}
+        {/* Regenerate button - Teal branded */}
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               type="button"
               onClick={onRegenerate}
               disabled={!hasContent || isGenerating}
-              className={regenerateButtonClasses}
+              className="
+                flex items-center justify-center gap-1.5 px-4 h-[42px] rounded-xl
+                bg-gradient-to-b from-teal to-teal-hover
+                border border-teal-hover/50
+                shadow-[0_2px_8px_rgba(93,237,215,0.3),inset_0_1px_0_rgba(255,255,255,0.2)]
+                hover:from-teal-hover hover:to-teal
+                hover:shadow-[0_4px_12px_rgba(93,237,215,0.4),inset_0_1px_0_rgba(255,255,255,0.25)]
+                active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.15)]
+                transition-all duration-150 ease-out
+                disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none
+                group
+              "
             >
-              <RotateCw className={`w-3.5 h-3.5 text-slate-500 dark:text-slate-400 ${isGenerating ? 'animate-spin' : ''}`} strokeWidth={2.5} />
-              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Regenerate</span>
+              <RotateCw
+                className={`w-4 h-4 text-white ${isGenerating ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-300'}`}
+                strokeWidth={2.5}
+              />
+              <span className="text-xs font-semibold text-white uppercase tracking-wide">
+                Regenerate
+              </span>
             </button>
           </TooltipTrigger>
-          <TooltipContent>Regenerate content</TooltipContent>
+          <TooltipContent>Regenerate content with current settings</TooltipContent>
         </Tooltip>
       </div>
 
+      {/* Right section: Export Actions */}
       <div className="flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-9 w-9 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
               onClick={handleCopy}
               disabled={!hasContent}
             >
-              <Copy className="w-4 h-4" />
+              <Copy className="w-4 h-4 text-muted-foreground" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Copy to clipboard</TooltipContent>
@@ -207,47 +210,57 @@ export const PreviewToolbar = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-9 w-9 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                   disabled={!hasContent}
                 >
-                  <Download className="w-4 h-4" />
+                  <Download className="w-4 h-4 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
             <TooltipContent>Export</TooltipContent>
           </Tooltip>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handleExportMarkdown}>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={handleExportMarkdown} className="gap-2">
+              <FileText className="w-4 h-4" />
               Markdown (.md)
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleExportWord} disabled={isDownloading}>
+            <DropdownMenuItem onClick={handleExportWord} disabled={isDownloading} className="gap-2">
               {isDownloading ? (
                 <>
-                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   Downloading...
                 </>
               ) : (
-                'Word Document (.docx)'
+                <>
+                  <FileText className="w-4 h-4" />
+                  Word Document (.docx)
+                </>
               )}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleExportImages} disabled={!hasImages || isDownloading}>
+            <DropdownMenuItem onClick={handleExportImages} disabled={!hasImages || isDownloading} className="gap-2">
               {isDownloading ? (
                 <>
-                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   Downloading...
                 </>
               ) : (
-                'Images (.zip)'
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  Images (.zip)
+                </>
               )}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleExportAll} disabled={isDownloading}>
+            <DropdownMenuItem onClick={handleExportAll} disabled={isDownloading} className="gap-2">
               {isDownloading ? (
                 <>
-                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   Downloading...
                 </>
               ) : (
-                'All Content (.zip)'
+                <>
+                  <Download className="w-4 h-4" />
+                  All Content (.zip)
+                </>
               )}
             </DropdownMenuItem>
           </DropdownMenuContent>

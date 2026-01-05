@@ -47,10 +47,10 @@ export const StyleDropdown = ({ onNavigateToSettings, onStyleChange }: StyleDrop
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-9 gap-2">
+        <Button variant="ghost" className="h-9 gap-2 px-3 rounded-lg hover:bg-primary/5 hover:text-primary transition-colors">
           <Palette className="w-4 h-4" />
-          <span className="text-sm">Style: {styleLabels[localStyle]}</span>
-          <ChevronDown className="w-3.5 h-3.5" />
+          <span className="text-sm font-medium">Style: {styleLabels[localStyle]}</span>
+          <ChevronDown className="w-3.5 h-3.5 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">

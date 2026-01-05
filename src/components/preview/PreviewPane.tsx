@@ -59,7 +59,7 @@ export const PreviewPane = ({
   const bodyImages = plannedImages.filter((img) => img.placement === 'bottom');
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-gradient-to-br from-slate-50 via-background to-slate-100/50 dark:from-slate-900 dark:via-background dark:to-slate-800/50">
       <PreviewToolbar
         content={content.text}
         hasContent={hasContent}

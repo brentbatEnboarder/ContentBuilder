@@ -130,8 +130,8 @@ export function buildSystemPrompt(
 
   // Build target length guidance if provided
   const lengthGuidance = targetWordLength
-    ? `\n\n## Content Length
-Generate content that is approximately **${targetWordLength} words** in length. This is a target, not a hard limit - prioritize quality and completeness over hitting the exact word count. If the content naturally requires more or fewer words to be effective, that's acceptable.`
+    ? `\n\n## Content Length Requirement
+**IMPORTANT**: Generate content that is approximately **${targetWordLength} words** (±10%). This is a firm target. Stay within ${Math.round(targetWordLength * 0.9)}-${Math.round(targetWordLength * 1.1)} words. Do not significantly exceed this limit - be concise and focused rather than verbose.`
     : '';
 
   return `You are an expert content writer for Enboarder, a platform that creates employee journey content (onboarding, offboarding, transitions, etc.).
@@ -973,6 +973,8 @@ export async function* generateContentStreamWithTools(
   }>
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const client = getClaudeClient();
+
+  console.log(`[Claude API] Target word length: ${request.targetWordLength || 'not specified'}`);
 
   const systemPrompt = buildSystemPrompt(
     request.companyProfile,

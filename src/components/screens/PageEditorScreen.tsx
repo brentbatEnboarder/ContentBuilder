@@ -351,6 +351,19 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     }
   }, [generatedContent.text]);
 
+  // Handle regenerating text content with current settings
+  const handleRegenerateText = useCallback(() => {
+    if (!generatedContent.text) {
+      toast.error('No content to regenerate');
+      return;
+    }
+
+    // Send a regenerate request through the chat
+    setIsGenerating(true);
+    sendMessage('Please regenerate this content with a fresh take, keeping the same topic and structure but improving the writing.');
+    setTimeout(() => setIsGenerating(false), 1500);
+  }, [generatedContent.text, setIsGenerating, sendMessage]);
+
   // Handle approving image plan via the "Go" button
   const handleApproveImagePlan = useCallback(async () => {
     if (!isImagePlanningRef.current || imagePlanState !== 'planning') return;
@@ -506,7 +519,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
             content={generatedContent}
             isGenerating={isGenerating}
             onNavigateToVoice={() => onNavigate('voice')}
-            onRegenerate={handleGenerateImages}
+            onRegenerate={handleRegenerateText}
             contentBlocks={blocks}
             onReorderBlocks={reorderBlocks}
             onDeleteBlock={deleteBlock}

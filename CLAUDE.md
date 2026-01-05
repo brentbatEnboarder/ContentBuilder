@@ -174,6 +174,10 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 82. **Live Preview Enhancement** - Example text larger and bold with quotation marks
 83. **Target Word Length Control** - User-configurable target (default 300 words) with ±25% Shorter/Longer 3D buttons, auto-saves per customer
 84. **Preview Toolbar Redesign** - Word count pill, compact 3D target controls aligned with input, 3D regenerate button moved left
+85. **Extended Brand Color Palette** - Added coral (#fc7361), teal (#5dedd7), golden (#ffc820), magenta, sky, mint to CSS/Tailwind design system
+86. **Page Editor Styling Refresh** - Coral CTAs (Generate Imagery), teal Regenerate button, purple Send, reduced purple overuse
+87. **Stricter Target Word Length** - Prompt now enforces ±10% range (e.g., 450-550 for 500 target) instead of soft guidance
+88. **Regenerate Button Fix** - Now regenerates text content instead of triggering image generation flow
 
 ## Environment Variables
 
@@ -258,7 +262,9 @@ In Google Cloud Console OAuth 2.0 credentials:
 ### Styling
 - Tailwind semantic tokens: `text-foreground`, `bg-background`, `border-border`
 - Never raw colors like `text-white` or `bg-black`
-- Primary color: Purple (#7C21CC)
+- **Primary colors:** Purple (#7C21CC) for AI/branding, Coral (#fc7361) for CTAs, Teal (#5dedd7) for positive actions
+- **Extended palette:** `bg-coral`, `bg-teal`, `bg-golden`, `bg-magenta`, `bg-sky`, `bg-mint` (defined in index.css + tailwind.config.ts)
+- **Button hierarchy:** Coral for primary CTAs, Teal for regenerate/refresh, Purple for AI-related (send), Slate for neutral
 
 ### Hooks Pattern
 ```tsx

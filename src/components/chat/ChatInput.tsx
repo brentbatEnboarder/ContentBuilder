@@ -79,7 +79,7 @@ export const ChatInput = ({
 
   return (
     <div
-      className="relative bg-gradient-to-t from-muted/50 via-background to-background border-t border-border px-4 pt-3 pb-4"
+      className="relative bg-gradient-to-t from-slate-50 via-card to-card dark:from-slate-900 dark:via-card dark:to-card border-t border-border/50 px-4 pt-3 pb-4"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -118,11 +118,22 @@ export const ChatInput = ({
           />
         )}
         {onGenerateImages && (
-          <Button
-            variant="outline"
-            className="flex-1 gap-2 bg-background hover:bg-muted"
+          <button
+            type="button"
             onClick={onGenerateImages}
             disabled={!hasContent || isGeneratingImages}
+            className="
+              flex-1 flex items-center justify-center gap-2 h-10 px-4 rounded-xl
+              bg-gradient-to-b from-coral to-coral-hover
+              text-white font-medium text-sm
+              border border-coral-hover/50
+              shadow-[0_2px_8px_rgba(252,115,97,0.35),inset_0_1px_0_rgba(255,255,255,0.2)]
+              hover:from-coral-hover hover:to-coral
+              hover:shadow-[0_4px_16px_rgba(252,115,97,0.45),inset_0_1px_0_rgba(255,255,255,0.25)]
+              active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.15)]
+              transition-all duration-150 ease-out
+              disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none
+            "
           >
             {isGeneratingImages ? (
               <>
@@ -135,12 +146,12 @@ export const ChatInput = ({
                 Generate Imagery
               </>
             )}
-          </Button>
+          </button>
         )}
       </div>
 
       {/* Input box with embedded buttons - elevated card style */}
-      <div className="relative rounded-xl bg-background border border-border shadow-sm shadow-primary/5 focus-within:shadow-md focus-within:shadow-primary/10 focus-within:border-primary/30 transition-all duration-200">
+      <div className="relative rounded-xl bg-card border border-border/80 shadow-[0_2px_8px_rgba(0,0,0,0.04)] focus-within:shadow-[0_4px_16px_rgba(124,33,204,0.12)] focus-within:border-primary/40 transition-all duration-200">
         <textarea
           ref={textareaRef}
           value={value}
@@ -148,7 +159,7 @@ export const ChatInput = ({
           onKeyDown={handleKeyDown}
           placeholder="Type, paste URL, or drop files..."
           disabled={disabled}
-          className="w-full min-h-[80px] max-h-[160px] px-4 py-3 pb-12 bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground disabled:opacity-50"
+          className="w-full min-h-[80px] max-h-[160px] px-4 py-3 pb-12 bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground/60 disabled:opacity-50"
           rows={2}
         />
 
@@ -160,7 +171,7 @@ export const ChatInput = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 rounded-lg hover:bg-muted"
+                className="h-8 w-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={disabled}
               >
@@ -171,13 +182,13 @@ export const ChatInput = ({
           </Tooltip>
 
           {/* Mic + Send buttons - bottom right */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 rounded-lg hover:bg-muted"
+                  className="h-8 w-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-muted-foreground"
                   disabled
                 >
                   <Mic className="w-4 h-4" />
@@ -186,14 +197,23 @@ export const ChatInput = ({
               <TooltipContent>Voice input (coming soon)</TooltipContent>
             </Tooltip>
 
-            <Button
-              size="icon"
-              className="h-8 w-8 rounded-lg shadow-sm"
+            <button
+              type="button"
               onClick={handleSubmit}
               disabled={!canSend}
+              className="
+                h-8 w-8 rounded-lg flex items-center justify-center
+                bg-gradient-to-b from-primary to-primary-hover
+                text-white
+                shadow-[0_2px_6px_rgba(124,33,204,0.35),inset_0_1px_0_rgba(255,255,255,0.15)]
+                hover:shadow-[0_3px_10px_rgba(124,33,204,0.45)]
+                active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]
+                transition-all duration-150 ease-out
+                disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none
+              "
             >
               <SendHorizontal className="w-4 h-4" />
-            </Button>
+            </button>
           </div>
         </div>
       </div>

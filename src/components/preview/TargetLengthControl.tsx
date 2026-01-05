@@ -55,21 +55,23 @@ export const TargetLengthControl = ({
     onAdjust(1.25); // +25%
   };
 
-  // Compact 3D button styles
+  // Refined 3D button styles with subtle primary accent
   const buttonClasses = `
-    flex flex-col items-center justify-center w-[52px] h-[42px] rounded-lg
-    bg-gradient-to-b from-white to-slate-100
+    flex flex-col items-center justify-center w-[52px] h-[42px] rounded-xl
+    bg-gradient-to-b from-white to-slate-50
     dark:from-slate-700 dark:to-slate-800
-    border border-slate-200/80 dark:border-slate-600
-    shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.8)]
-    dark:shadow-[0_1px_3px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)]
-    hover:from-slate-50 hover:to-slate-100 hover:border-slate-300
-    hover:shadow-[0_2px_4px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]
+    border border-slate-200 dark:border-slate-600
+    shadow-[0_1px_4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]
+    dark:shadow-[0_1px_4px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)]
+    hover:border-primary/30 hover:bg-gradient-to-b hover:from-primary/5 hover:to-white
+    hover:shadow-[0_2px_8px_rgba(124,33,204,0.1),inset_0_1px_0_rgba(255,255,255,0.95)]
     dark:hover:from-slate-600 dark:hover:to-slate-700
-    active:from-slate-100 active:to-slate-150 active:shadow-[inset_0_1px_3px_rgba(0,0,0,0.1)]
+    active:bg-gradient-to-b active:from-slate-100 active:to-slate-50
+    active:shadow-[inset_0_1px_3px_rgba(0,0,0,0.08)]
     dark:active:from-slate-750 dark:active:to-slate-800
-    transition-all duration-100 ease-out
-    disabled:opacity-40 disabled:cursor-not-allowed
+    transition-all duration-150 ease-out
+    disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-slate-200 disabled:hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)]
+    group
   `;
 
   return (
@@ -83,8 +85,8 @@ export const TargetLengthControl = ({
             disabled={disabled || value <= 50}
             className={buttonClasses}
           >
-            <Minus className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" strokeWidth={2.5} />
-            <span className="text-[9px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 uppercase tracking-wide leading-none">Shorter</span>
+            <Minus className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 group-hover:text-primary/70 transition-colors" strokeWidth={2.5} />
+            <span className="text-[9px] font-medium text-slate-500 dark:text-slate-400 group-hover:text-primary/70 mt-0.5 uppercase tracking-wide leading-none transition-colors">Shorter</span>
           </button>
         </TooltipTrigger>
         <TooltipContent>Reduce by 25%</TooltipContent>
@@ -92,7 +94,7 @@ export const TargetLengthControl = ({
 
       {/* Target Value - Compact stacked */}
       <div className="flex flex-col items-center">
-        <span className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium leading-none mb-0.5">Target</span>
+        <span className="text-[9px] text-muted-foreground/70 uppercase tracking-wide font-medium leading-none mb-0.5">Target</span>
         <Input
           type="text"
           inputMode="numeric"
@@ -101,9 +103,9 @@ export const TargetLengthControl = ({
           onBlur={handleInputBlur}
           onKeyDown={handleKeyDown}
           disabled={disabled}
-          className="h-[26px] w-14 text-xs text-center tabular-nums font-semibold px-1"
+          className="h-[26px] w-14 text-xs text-center tabular-nums font-semibold px-1 border-slate-200 focus:border-primary/40 focus:ring-primary/20"
         />
-        <span className="text-[9px] text-muted-foreground font-medium leading-none mt-0.5">words</span>
+        <span className="text-[9px] text-muted-foreground/70 font-medium leading-none mt-0.5">words</span>
       </div>
 
       {/* Longer Button - Compact 3D */}
@@ -115,8 +117,8 @@ export const TargetLengthControl = ({
             disabled={disabled || value >= 5000}
             className={buttonClasses}
           >
-            <Plus className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" strokeWidth={2.5} />
-            <span className="text-[9px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 uppercase tracking-wide leading-none">Longer</span>
+            <Plus className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 group-hover:text-primary/70 transition-colors" strokeWidth={2.5} />
+            <span className="text-[9px] font-medium text-slate-500 dark:text-slate-400 group-hover:text-primary/70 mt-0.5 uppercase tracking-wide leading-none transition-colors">Longer</span>
           </button>
         </TooltipTrigger>
         <TooltipContent>Increase by 25%</TooltipContent>

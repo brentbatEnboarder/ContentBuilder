@@ -59,6 +59,30 @@ export default {
         error: {
           DEFAULT: "hsl(var(--error))",
         },
+        coral: {
+          DEFAULT: "hsl(var(--coral))",
+          hover: "hsl(var(--coral-hover))",
+          foreground: "hsl(var(--coral-foreground))",
+        },
+        teal: {
+          DEFAULT: "hsl(var(--teal))",
+          hover: "hsl(var(--teal-hover))",
+          foreground: "hsl(var(--teal-foreground))",
+        },
+        golden: {
+          DEFAULT: "hsl(var(--golden))",
+          hover: "hsl(var(--golden-hover))",
+          foreground: "hsl(var(--golden-foreground))",
+        },
+        magenta: {
+          DEFAULT: "hsl(var(--magenta))",
+        },
+        sky: {
+          DEFAULT: "hsl(var(--sky))",
+        },
+        mint: {
+          DEFAULT: "hsl(var(--mint))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

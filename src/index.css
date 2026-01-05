@@ -49,6 +49,20 @@
     --destructive-foreground: 0 0% 100%;
     --error: 0 77% 49%;
 
+    /* Extended Brand Colors - Enboarder Palette */
+    --coral: 9 96% 69%;
+    --coral-hover: 9 96% 60%;
+    --coral-foreground: 0 0% 100%;
+    --teal: 167 81% 65%;
+    --teal-hover: 167 81% 55%;
+    --teal-foreground: 0 0% 100%;
+    --golden: 43 100% 56%;
+    --golden-hover: 43 100% 46%;
+    --golden-foreground: 0 0% 20%;
+    --magenta: 339 97% 56%;
+    --sky: 196 77% 68%;
+    --mint: 156 66% 59%;
+
     /* Radius */
     --radius: 0.5rem;
     --radius-sm: 4px;
@@ -100,6 +114,20 @@
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 252 20% 30%;
     --sidebar-ring: 270 100% 86%;
+
+    /* Extended Brand Colors - Dark Mode */
+    --coral: 9 96% 69%;
+    --coral-hover: 9 96% 75%;
+    --coral-foreground: 0 0% 100%;
+    --teal: 167 81% 65%;
+    --teal-hover: 167 81% 70%;
+    --teal-foreground: 0 0% 100%;
+    --golden: 43 100% 56%;
+    --golden-hover: 43 100% 65%;
+    --golden-foreground: 0 0% 20%;
+    --magenta: 339 97% 56%;
+    --sky: 196 77% 68%;
+    --mint: 156 66% 59%;
   }
 }
 

@@ -39,10 +39,10 @@ export const VoiceDropdown = ({ onNavigateToSettings }: VoiceDropdownProps) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-9 gap-2">
+        <Button variant="ghost" className="h-9 gap-2 px-3 rounded-lg hover:bg-primary/5 hover:text-primary transition-colors">
           <SlidersHorizontal className="w-4 h-4" />
-          <span className="text-sm">Voice: {getVoiceSummary(settings)}</span>
-          <ChevronDown className="w-3.5 h-3.5" />
+          <span className="text-sm font-medium">Voice: {getVoiceSummary(settings)}</span>
+          <ChevronDown className="w-3.5 h-3.5 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">

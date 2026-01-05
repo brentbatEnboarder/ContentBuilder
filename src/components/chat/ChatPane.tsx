@@ -32,7 +32,7 @@ export const ChatPane = ({
   onApproveImagePlan,
 }: ChatPaneProps) => {
   return (
-    <div className="flex flex-col h-full bg-card border-r border-border">
+    <div className="flex flex-col h-full bg-gradient-to-b from-card via-card to-slate-50/30 dark:to-slate-900/30 border-r border-border/50">
       <ChatMessages
         messages={messages}
         isLoading={isLoading}

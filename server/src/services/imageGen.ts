@@ -321,7 +321,7 @@ export interface ImageStreamEvent {
 
 /**
  * Generate images with streaming - yields each image as it completes
- * Uses an async generator pattern for SSE streaming
+ * Uses a queue-based approach to avoid Promise.race index tracking issues
  */
 export async function* generateImagesStreaming(
   request: GenerateImagesRequest
@@ -344,59 +344,73 @@ export async function* generateImagesStreaming(
   console.log(`[ImageGen] Generating ${count} images in PARALLEL with streaming...`);
   const overallStartTime = Date.now();
 
-  // Track which images have been yielded
+  // Use a queue-based approach: each promise pushes its result to a queue when done
+  // This avoids the Promise.race index tracking issues
+  type QueueItem = { index: number; image: GeneratedImage | null; error: string | null };
+  const resultQueue: QueueItem[] = [];
+  let resolveWaiting: (() => void) | null = null;
+
+  // Track completion
   const yieldedIndices = new Set<number>();
   let completedCount = 0;
 
-  // Create promises for all variations
+  // Start all image generations in parallel
+  // Each one pushes to the queue when done
   const imagePromises = Array.from({ length: count }, async (_, i) => {
     try {
+      console.log(`[ImageGen] Starting variation ${i + 1}/${count}...`);
       const image = await generateSingleVariation(client, prompt, i, count, aspectRatio);
-      return { index: i, image, error: null };
+      resultQueue.push({ index: i, image, error: null });
+      console.log(`[ImageGen] Variation ${i + 1}/${count} completed, queued for streaming`);
     } catch (error) {
-      return {
-        index: i,
-        image: null,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      resultQueue.push({ index: i, image: null, error: errorMsg });
+      console.error(`[ImageGen] Variation ${i + 1}/${count} failed:`, errorMsg);
+    }
+    // Notify the generator that a result is available
+    if (resolveWaiting) {
+      resolveWaiting();
+      resolveWaiting = null;
     }
   });
 
-  // Race all promises and yield as each completes
-  const pendingPromises = [...imagePromises];
+  // Yield results as they arrive in the queue
+  while (completedCount < count) {
+    // Wait for a result if queue is empty
+    while (resultQueue.length === 0) {
+      await new Promise<void>((resolve) => {
+        resolveWaiting = resolve;
+      });
+    }
 
-  while (pendingPromises.length > 0) {
-    // Race to find the first completed promise
-    const result = await Promise.race(
-      pendingPromises.map(async (p, idx) => {
-        const res = await p;
-        return { promiseIndex: idx, ...res };
-      })
-    );
+    // Process all available results
+    while (resultQueue.length > 0) {
+      const result = resultQueue.shift()!;
+      completedCount++;
 
-    // Remove the completed promise from pending
-    pendingPromises.splice(result.promiseIndex, 1);
-
-    completedCount++;
-
-    if (result.image) {
-      yieldedIndices.add(result.index);
-      yield {
-        type: 'image',
-        variationIndex: result.index,
-        totalCount: count,
-        image: result.image,
-      };
-    } else {
-      console.error(`[ImageGen] Streaming: Image ${result.index + 1} failed:`, result.error);
-      yield {
-        type: 'error',
-        variationIndex: result.index,
-        totalCount: count,
-        error: result.error || 'Image generation failed',
-      };
+      if (result.image) {
+        yieldedIndices.add(result.index);
+        console.log(`[ImageGen] Yielding image ${result.index + 1}/${count}`);
+        yield {
+          type: 'image',
+          variationIndex: result.index,
+          totalCount: count,
+          image: result.image,
+        };
+      } else {
+        console.error(`[ImageGen] Yielding error for image ${result.index + 1}/${count}:`, result.error);
+        yield {
+          type: 'error',
+          variationIndex: result.index,
+          totalCount: count,
+          error: result.error || 'Image generation failed',
+        };
+      }
     }
   }
+
+  // Wait for all promises to complete (they should all be done by now)
+  await Promise.allSettled(imagePromises);
 
   const overallDuration = Date.now() - overallStartTime;
   console.log(`[ImageGen] Streaming complete: ${yieldedIndices.size}/${count} images in ${overallDuration}ms`);

@@ -142,8 +142,12 @@ export const useStyleSettings = () => {
   );
 
   // Save draft to Supabase
-  const save = useCallback(async () => {
-    return saveMutation.mutateAsync(draft);
+  // Optional parameter allows saving new settings without waiting for draft state update
+  const save = useCallback(async (overrideSettings?: Partial<StyleSettings>) => {
+    const settingsToSave = overrideSettings
+      ? { ...draft, ...overrideSettings }
+      : draft;
+    return saveMutation.mutateAsync(settingsToSave);
   }, [draft, saveMutation]);
 
   // Cancel changes and revert to saved settings

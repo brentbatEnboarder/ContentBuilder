@@ -40,7 +40,9 @@ export const StyleDropdown = ({ onNavigateToSettings, onStyleChange }: StyleDrop
   const handleStyleSelect = (style: ImageStyleType) => {
     setLocalStyle(style); // Update local state immediately for UI feedback
     selectStyle(style);
-    save();
+    // Pass the new style directly to save() to avoid stale closure bug
+    // (draft state won't be updated yet when save() is called synchronously)
+    save({ selectedStyle: style });
     onStyleChange?.();
   };
 

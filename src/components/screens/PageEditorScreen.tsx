@@ -42,6 +42,7 @@ interface PageEditorScreenProps {
 export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScreenProps) => {
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const isImagePlanningRef = useRef(false);
   // State for inline image editing modal
   const [editingInlineImage, setEditingInlineImage] = useState<string | null>(null);
@@ -238,6 +239,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
   }, [onBack]);
 
   const handleSave = useCallback(async () => {
+    setIsSaving(true);
     try {
       await save();
       setShowSaved(true);
@@ -246,13 +248,15 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     } catch (error) {
       toast.error('Failed to save page');
       console.error('Save error:', error);
+    } finally {
+      setIsSaving(false);
     }
   }, [save]);
 
   // Register header actions
   useRegisterHeaderActions(
     isDirty,
-    false, // isSaving - we handle this locally
+    isSaving,
     handleSave,
     () => {}, // onCancel - not used for page editor
     {

@@ -63,13 +63,31 @@ export interface VoiceSettings {
   enthusiasm: number;
 }
 
+/**
+ * Source material for file attachments
+ * Can be either extracted text or a PDF document for Claude's native handling
+ */
+export interface SourceMaterial {
+  type: 'text' | 'document';
+  /** Extracted text content (for DOCX, TXT, PPTX, XLSX) */
+  text?: string;
+  /** PDF document data for Claude's document API */
+  document?: {
+    mediaType: string;
+    base64Data: string;
+    fileName?: string;
+  };
+  /** Display name for the source */
+  name?: string;
+}
+
 export interface GenerateTextRequest {
   objective: string;
   companyProfile: CompanyProfile;
   voiceSettings: VoiceSettings;
   imageStyle?: string;
   targetWordLength?: number;
-  sourceMaterials?: string[];
+  sourceMaterials?: SourceMaterial[];
   feedback?: string;
   stream?: boolean;
   currentContent?: string;
@@ -128,6 +146,10 @@ export interface ProcessedFileResult {
     pageCount?: number;
     preview?: string;
     metadata?: Record<string, string>;
+    /** True if content was truncated due to length */
+    wasTruncated?: boolean;
+    /** Original character count before truncation */
+    originalLength?: number;
   };
 }
 
@@ -554,7 +576,7 @@ export const apiClient = {
   },
 
   /**
-   * Process an uploaded file (PDF, DOCX, TXT, PPTX)
+   * Process an uploaded file (PDF, DOCX, TXT, PPTX, XLSX)
    */
   processFile: async (file: File): Promise<ProcessedFileResult> => {
     const formData = new FormData();

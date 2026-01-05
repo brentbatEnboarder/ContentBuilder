@@ -6,10 +6,12 @@
  * - DOCX: Uses mammoth for Word document parsing
  * - TXT: Direct text extraction with encoding detection
  * - PPTX: Extracts text from PowerPoint XML structure
+ * - XLSX: Converts spreadsheets to markdown tables
  */
 
 import mammoth from 'mammoth';
 import JSZip from 'jszip';
+import * as XLSX from 'xlsx';
 
 // ============================================================
 // Types & Interfaces
@@ -22,7 +24,7 @@ import JSZip from 'jszip';
 export interface ProcessedFile {
   /** The type of result */
   type: 'text' | 'document';
-  /** Extracted text content (for DOCX, TXT, PPTX) */
+  /** Extracted text content (for DOCX, TXT, PPTX, XLSX) */
   text?: string;
   /** Document data for direct LLM consumption (for PDF) */
   document?: {
@@ -34,6 +36,10 @@ export interface ProcessedFile {
   pageCount?: number;
   /** Additional metadata */
   metadata?: Record<string, string>;
+  /** True if content was truncated due to length */
+  wasTruncated?: boolean;
+  /** Original character count before truncation */
+  originalLength?: number;
 }
 
 export interface ProcessFileOptions {
@@ -63,7 +69,9 @@ export const SUPPORTED_MIME_TYPES = {
   'application/pdf': 'pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   'text/plain': 'txt',
+  'text/markdown': 'txt', // Markdown files use same processor as plain text
   'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
 } as const;
 
 export type SupportedMimeType = keyof typeof SUPPORTED_MIME_TYPES;
@@ -312,6 +320,137 @@ function extractTextFromPptxXml(xml: string): string {
 }
 
 // ============================================================
+// XLSX Processing (SheetJS)
+// ============================================================
+
+// Limits for XLSX processing
+const XLSX_MAX_ROWS_PER_SHEET = 100;
+const XLSX_MAX_COLUMNS = 20;
+
+/**
+ * Process XLSX by converting sheets to markdown tables
+ * Limits rows and columns to prevent huge context usage
+ */
+export async function processXLSX(buffer: Buffer): Promise<ProcessedFile> {
+  try {
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const textParts: string[] = [];
+    let totalRows = 0;
+
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+
+      // Convert to array of arrays
+      const data: unknown[][] = XLSX.utils.sheet_to_json(sheet, {
+        header: 1,
+        defval: '',
+      });
+
+      if (data.length === 0) continue;
+
+      // Limit rows and columns
+      const limitedData = data.slice(0, XLSX_MAX_ROWS_PER_SHEET);
+      const truncatedRows = data.length > XLSX_MAX_ROWS_PER_SHEET;
+
+      // Get headers (first row)
+      const headers = (limitedData[0] || []).slice(0, XLSX_MAX_COLUMNS).map(String);
+      const truncatedCols = (limitedData[0]?.length || 0) > XLSX_MAX_COLUMNS;
+
+      if (headers.length === 0) continue;
+
+      let tableMarkdown = `### Sheet: ${sheetName}\n\n`;
+
+      // Header row
+      tableMarkdown += '| ' + headers.join(' | ') + ' |\n';
+      tableMarkdown += '| ' + headers.map(() => '---').join(' | ') + ' |\n';
+
+      // Data rows
+      for (let i = 1; i < limitedData.length; i++) {
+        const row = (limitedData[i] || []).slice(0, XLSX_MAX_COLUMNS).map((cell) =>
+          String(cell ?? '')
+            .replace(/\|/g, '\\|')
+            .replace(/\n/g, ' ')
+        );
+        // Pad row if shorter than headers
+        while (row.length < headers.length) row.push('');
+        tableMarkdown += '| ' + row.join(' | ') + ' |\n';
+        totalRows++;
+      }
+
+      // Add truncation notices
+      if (truncatedRows || truncatedCols) {
+        const notices: string[] = [];
+        if (truncatedRows) notices.push(`${data.length - XLSX_MAX_ROWS_PER_SHEET} rows omitted`);
+        if (truncatedCols) notices.push(`columns limited to ${XLSX_MAX_COLUMNS}`);
+        tableMarkdown += `\n*Note: ${notices.join(', ')}*\n`;
+      }
+
+      textParts.push(tableMarkdown);
+    }
+
+    const text = textParts.join('\n\n');
+
+    if (!text.trim()) {
+      throw new FileProcessorError('XLSX spreadsheet appears to be empty', 'EMPTY_FILE');
+    }
+
+    return {
+      type: 'text',
+      text: text.trim(),
+      metadata: {
+        sheetCount: String(workbook.SheetNames.length),
+        totalDataRows: String(totalRows),
+      },
+    };
+  } catch (error) {
+    if (error instanceof FileProcessorError) throw error;
+
+    console.error('XLSX processing error:', error);
+    throw new FileProcessorError(
+      `Failed to process XLSX: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      'PROCESSING_FAILED',
+      error
+    );
+  }
+}
+
+// ============================================================
+// Content Truncation
+// ============================================================
+
+// Max content size for AI context (about 50K chars)
+const MAX_CONTENT_CHARS = 50000;
+const TRUNCATION_MESSAGE = '\n\n[... Content truncated due to length ...]';
+
+/**
+ * Truncate text content if too long, preserving word boundaries
+ */
+function truncateContent(text: string): {
+  text: string;
+  wasTruncated: boolean;
+  originalLength: number;
+} {
+  const originalLength = text.length;
+
+  if (originalLength <= MAX_CONTENT_CHARS) {
+    return { text, wasTruncated: false, originalLength };
+  }
+
+  // Find last space before the limit to avoid cutting words
+  let truncateAt = MAX_CONTENT_CHARS - TRUNCATION_MESSAGE.length;
+  const lastSpace = text.lastIndexOf(' ', truncateAt);
+  if (lastSpace > truncateAt - 1000) {
+    truncateAt = lastSpace;
+  }
+
+  return {
+    text: text.slice(0, truncateAt) + TRUNCATION_MESSAGE,
+    wasTruncated: true,
+    originalLength,
+  };
+}
+
+// ============================================================
 // Main Processing Function
 // ============================================================
 
@@ -345,7 +484,7 @@ export async function processFile(
 
   if (!fileType) {
     throw new FileProcessorError(
-      `Unsupported file type: ${mimeType}. Supported types: PDF, DOCX, TXT, PPTX`,
+      `Unsupported file type: ${mimeType}. Supported types: PDF, DOCX, TXT, PPTX, XLSX`,
       'UNSUPPORTED_FORMAT'
     );
   }
@@ -370,6 +509,9 @@ export async function processFile(
     case 'pptx':
       result = await processPPTX(buffer);
       break;
+    case 'xlsx':
+      result = await processXLSX(buffer);
+      break;
     default:
       throw new FileProcessorError(
         `No processor available for type: ${fileType}`,
@@ -377,11 +519,25 @@ export async function processFile(
       );
   }
 
+  // Apply truncation for text results to stay within AI context limits
+  if (result.type === 'text' && result.text) {
+    const { text, wasTruncated, originalLength } = truncateContent(result.text);
+    result.text = text;
+    result.wasTruncated = wasTruncated;
+    result.originalLength = originalLength;
+
+    if (wasTruncated) {
+      console.log(
+        `[FileProcessor] Content truncated: ${originalLength.toLocaleString()} -> ${text.length.toLocaleString()} chars`
+      );
+    }
+  }
+
   const duration = Date.now() - startTime;
   const sizeInfo =
     result.type === 'text'
-      ? `extracted ${result.text?.length || 0} chars`
-      : `prepared ${((buffer.length / 1024).toFixed(1))}KB for Claude`;
+      ? `extracted ${result.text?.length || 0} chars${result.wasTruncated ? ' (truncated)' : ''}`
+      : `prepared ${(buffer.length / 1024).toFixed(1)}KB for Claude`;
   console.log(`[FileProcessor] Completed in ${duration}ms, ${sizeInfo}`);
 
   return result;

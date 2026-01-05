@@ -32,7 +32,8 @@
     "node-vibrant": "^4.0.3",
     "openai": "^4.103.0",
     "pdf-parse": "^1.1.1",
-    "playwright": "^1.57.0"
+    "playwright": "^1.57.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/archiver": "^6.0.3",

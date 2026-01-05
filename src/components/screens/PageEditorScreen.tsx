@@ -63,14 +63,11 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
   const { settings: styleSettings } = useStyleSettings();
   const { settings: companySettings } = useCompanySettings();
 
-  // Content blocks for draggable preview
+  // Content blocks (used for image generation modal)
   const {
     blocks,
     setAllBlocks,
-    reorderBlocks,
-    deleteBlock,
     addBlock,
-    updateBlock,
   } = useContentBlocks();
 
   // Image planning hook (conversational flow)
@@ -133,80 +130,32 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
   // Handle streaming content updates
   const handleContentStreaming = useCallback(
     (text: string) => {
-      // Update text but preserve images and blocks
-      const updatedBlocks = blocks.length > 0
-        ? blocks.map(b => b.type === 'text' ? { ...b, content: text } : b)
-        : generatedContent.contentBlocks;
-
       updateGeneratedContent({
         text,
         images: generatedContent.images,
-        contentBlocks: updatedBlocks,
+        contentBlocks: generatedContent.contentBlocks,
       });
-
-      // Also sync to content blocks if they exist (keeps header/body images intact)
-      const textBlock = blocks.find((b) => b.type === 'text');
-      if (textBlock) {
-        updateBlock(textBlock.id, { content: text });
-      }
     },
-    [updateGeneratedContent, generatedContent.images, generatedContent.contentBlocks, blocks, updateBlock]
+    [updateGeneratedContent, generatedContent.images, generatedContent.contentBlocks]
   );
 
   // Handle final content
   const handleContentGenerated = useCallback(
     async (content: { text: string; images: string[] }) => {
-      // Preserve existing contentBlocks, just update the text in them
-      const updatedBlocks = blocks.length > 0
-        ? blocks.map(b => b.type === 'text' ? { ...b, content: content.text } : b)
-        : generatedContent.contentBlocks;
-
       updateGeneratedContent({
         text: content.text,
         images: generatedContent.images, // Keep existing images
-        contentBlocks: updatedBlocks,
-      });
-
-      // Also sync to content blocks if they exist
-      const textBlock = blocks.find((b) => b.type === 'text');
-      if (textBlock) {
-        updateBlock(textBlock.id, { content: content.text });
-      }
-    },
-    [updateGeneratedContent, generatedContent.images, generatedContent.contentBlocks, blocks, updateBlock]
-  );
-
-  // Handle block updates (inline editing) - syncs to both local blocks and generatedContent
-  const handleUpdateBlock = useCallback(
-    (blockId: string, updates: Partial<ContentBlock>) => {
-      // Update the local blocks state
-      updateBlock(blockId, updates);
-
-      // Also sync to generatedContent for persistence
-      const updatedBlocks = blocks.map((block) => {
-        if (block.id !== blockId) return block;
-        return { ...block, ...updates } as ContentBlock;
-      });
-
-      // Extract text from text blocks
-      const textContent = updatedBlocks
-        .filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text')
-        .map((b) => b.content)
-        .join('\n\n');
-
-      updateGeneratedContent({
-        text: textContent,
-        images: generatedContent.images,
-        contentBlocks: updatedBlocks,
+        contentBlocks: generatedContent.contentBlocks,
       });
     },
-    [updateBlock, blocks, generatedContent.images, updateGeneratedContent]
+    [updateGeneratedContent, generatedContent.images, generatedContent.contentBlocks]
   );
 
   const {
     messages,
     isLoading,
     sendMessage,
+    sendMessageWithFiles,
     setMessages,
   } = useChat({
     initialMessages: page?.chatHistory || [],
@@ -278,7 +227,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     setMessages((prev) => [...prev, newMessage]);
   }, [setMessages]);
 
-  const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[]) => {
+  const handleSendMessage = useCallback(async (message: string, attachments?: FileAttachment[], files?: File[]) => {
     // Check if we're in image planning mode
     if (isImagePlanningRef.current && imagePlanState === 'planning') {
       // Add user message to chat
@@ -319,9 +268,14 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
 
     // Normal chat flow
     setIsGenerating(true);
-    sendMessage(message, attachments);
+    // Use sendMessageWithFiles when files are present to actually process file content
+    if (files && files.length > 0) {
+      sendMessageWithFiles(message, files);
+    } else {
+      sendMessage(message, attachments);
+    }
     setTimeout(() => setIsGenerating(false), 1500);
-  }, [imagePlanState, sendPlanMessage, generatedContent.text, getRecommendationsForModal, companySettings.colors, styleSettings.selectedStyle, imageModal, addMessage, setIsGenerating, sendMessage]);
+  }, [imagePlanState, sendPlanMessage, generatedContent.text, getRecommendationsForModal, companySettings.colors, styleSettings.selectedStyle, imageModal, addMessage, setIsGenerating, sendMessage, sendMessageWithFiles]);
 
   // Start image planning when "Generate Imagery" is clicked
   const handleGenerateImages = useCallback(async () => {
@@ -367,6 +321,15 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     sendMessage('Please regenerate this content with a fresh take, keeping the same topic and structure but improving the writing.');
     setTimeout(() => setIsGenerating(false), 1500);
   }, [generatedContent.text, setIsGenerating, sendMessage]);
+
+  // Handle inline text editing from ContentPreview
+  const handleTextChange = useCallback((newText: string) => {
+    updateGeneratedContent({
+      text: newText,
+      images: generatedContent.images,
+      contentBlocks: generatedContent.contentBlocks,
+    });
+  }, [updateGeneratedContent, generatedContent.images, generatedContent.contentBlocks]);
 
   // Handle approving image plan via the "Go" button
   const handleApproveImagePlan = useCallback(async () => {
@@ -524,10 +487,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
             isGenerating={isGenerating}
             onNavigateToVoice={() => onNavigate('voice')}
             onRegenerate={handleRegenerateText}
-            contentBlocks={blocks}
-            onReorderBlocks={reorderBlocks}
-            onDeleteBlock={deleteBlock}
-            onUpdateBlock={handleUpdateBlock}
+            onTextChange={handleTextChange}
             isGeneratingImages={isGeneratingImages}
             pageTitle={page?.title || 'Untitled'}
           />

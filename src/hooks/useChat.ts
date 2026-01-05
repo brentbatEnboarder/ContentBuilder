@@ -4,6 +4,7 @@ import { apiClient, CompanyProfile } from '@/services/api';
 import { useCompanySettings } from './useCompanySettings';
 import { useVoiceSettings } from './useVoiceSettings';
 import { useStyleSettings } from './useStyleSettings';
+import { toast } from 'sonner';
 
 const generateMessageId = () => `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -72,25 +73,9 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
   // Ref to track current assistant message ID for streaming updates
   const currentAssistantMessageId = useRef<string | null>(null);
 
-  /**
-   * Process file attachments and return their content as source materials
-   */
-  const processAttachments = async (attachments: FileAttachment[]): Promise<string[]> => {
-    const sourceMaterials: string[] = [];
-
-    for (const attachment of attachments) {
-      try {
-        // We need the actual File object, not just the metadata
-        // This assumes attachments include a way to get the file content
-        // For now, we'll add a placeholder - the UI component should pass File objects
-        sourceMaterials.push(`[Attached file: ${attachment.name}]`);
-      } catch (err) {
-        console.error(`Failed to process attachment ${attachment.name}:`, err);
-      }
-    }
-
-    return sourceMaterials;
-  };
+  // NOTE: processAttachments was removed - actual file processing now happens in
+  // sendMessageWithFiles() which receives File objects. The sendMessage() function
+  // is only called when no files are present (or only FileAttachment metadata).
 
   /**
    * Build company profile for the API request
@@ -135,10 +120,8 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
       setMessages((prev) => [...prev, assistantMessage]);
 
       try {
-        // Process any file attachments
-        const sourceMaterials = attachments?.length
-          ? await processAttachments(attachments)
-          : undefined;
+        // NOTE: File content is processed in sendMessageWithFiles().
+        // This sendMessage() is only called when no actual files are present.
 
         // Build conversation history from previous messages (excluding system messages and current)
         // Get messages before we added the user message and assistant placeholder
@@ -163,7 +146,6 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
           },
           imageStyle: effectiveImageStyle,
           targetWordLength: styleSettings.targetWordLength,
-          sourceMaterials,
           currentContent: currentContent || undefined,
           conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
         };
@@ -372,21 +354,55 @@ export const useChat = ({ initialMessages = [], onContentGenerated, onContentStr
       setMessages((prev) => [...prev, assistantMessage]);
 
       try {
-        // Process files and extract content
-        const sourceMaterials: string[] = [];
+        // Process files and extract content as SourceMaterial objects
+        // Backend expects { type: 'text' | 'document', text?: string, document?: {...}, name?: string }
+        const sourceMaterials: Array<{
+          type: 'text' | 'document';
+          text?: string;
+          document?: { mediaType: string; base64Data: string; fileName?: string };
+          name?: string;
+        }> = [];
+
         for (const file of files) {
           try {
             const result = await apiClient.processFile(file);
             if (result.success && result.data) {
+              // Check for truncation warning
+              if (result.data.wasTruncated) {
+                const originalKB = Math.round((result.data.originalLength || 0) / 1024);
+                toast.warning(`${file.name} was truncated`, {
+                  description: `File content exceeded 50K character limit (${originalKB}KB original). Some content may be missing.`,
+                });
+              }
+
               if (result.data.type === 'text' && result.data.text) {
-                sourceMaterials.push(`[Content from ${file.name}]:\n${result.data.text}`);
-              } else if (result.data.type === 'document' && result.data.preview) {
-                sourceMaterials.push(`[Content from ${file.name}]:\n${result.data.preview}`);
+                // Text-based files (DOCX, TXT, PPTX, XLSX)
+                sourceMaterials.push({
+                  type: 'text',
+                  text: result.data.text,
+                  name: file.name,
+                });
+              } else if (result.data.type === 'document' && result.data.document) {
+                // PDF files - send as document for Claude's native PDF handling
+                sourceMaterials.push({
+                  type: 'document',
+                  document: {
+                    mediaType: result.data.document.mediaType,
+                    base64Data: result.data.document.base64Data,
+                    fileName: file.name,
+                  },
+                  name: file.name,
+                });
               }
             }
           } catch (err) {
             console.error(`Failed to process file ${file.name}:`, err);
-            sourceMaterials.push(`[Failed to process ${file.name}]`);
+            // Add a placeholder text source for failed files
+            sourceMaterials.push({
+              type: 'text',
+              text: `[Failed to process file: ${file.name}]`,
+              name: file.name,
+            });
           }
         }
 

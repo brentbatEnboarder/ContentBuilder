@@ -60,7 +60,7 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 - **`useImageGeneration.ts`** - Gemini image generation
 - **`useImagePlanning.ts`** - Conversational image planning with AI recommendations
 - **`useImageModal.ts`** - State machine for image generation modal (selection, lightbox, edit, regenerate)
-- **`useContentBlocks.ts`** - Content block state with drag-drop reordering
+- **`useContentBlocks.ts`** - Content block state for image storage
 - **`usePageEditor.ts`** - Page editing state (auto-generates titles on first save)
 - **`useOnboardingHeaderActions.ts`** - Wraps header actions for onboarding wizard flow
 
@@ -196,6 +196,7 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 104. **Full-Pane Drag-Drop** - Drop zone now covers entire ChatPane with overlay, not just input box
 105. **Document-Level Drop Prevention** - Browser no longer opens files dropped anywhere on page
 106. **Aspect Ratio Normalization** - Frontend normalizes AI-recommended aspect ratios (e.g., `2:1` → `21:9`) to valid API values, fixing image generation failures
+107. **Simplified Inline Editing** - ContentPreview now has built-in click-to-edit functionality (hover shows "Click to edit", click opens markdown textarea, Esc cancels, click outside saves). Removed drag-drop content blocks in favor of simpler direct text editing.
 
 ## Environment Variables
 
@@ -600,7 +601,7 @@ The AI responds with structured `<image-plan>` JSON tags that are parsed to extr
 
 ### Image Generation Modal (Phases 7-9 Complete)
 
-A full-screen modal experience for image generation with selection, editing, and drag-to-reorder functionality.
+A full-screen modal experience for image generation with selection and editing functionality.
 
 **Implementation Status:** Core integration complete. See `tasks/page-save-improvements.md` for known issues.
 
@@ -612,12 +613,9 @@ A full-screen modal experience for image generation with selection, editing, and
 | Lightbox | `components/modals/ImageLightbox.tsx` | Full-screen view, keyboard nav |
 | Edit Panel | `components/modals/EditImagePanel.tsx` | Reference image + prompt editing |
 | Regenerate Popover | `components/modals/RegeneratePopover.tsx` | Modify prompt before regenerating |
-| Draggable Image | `components/content/DraggableImageCard.tsx` | Sortable card with @dnd-kit |
-| Draggable Preview | `components/content/DraggableContentPreview.tsx` | Content blocks + drag context |
-| Text Block | `components/content/TextBlock.tsx` | Markdown renderer |
-| Drop Zone | `components/content/DropZone.tsx` | Visual drop indicator |
+| Content Preview | `components/preview/ContentPreview.tsx` | Markdown display with inline editing |
 | useImageModal Hook | `hooks/useImageModal.ts` | State machine for modal flow |
-| Content Blocks Hook | `hooks/useContentBlocks.ts` | Block state management |
+| Content Blocks Hook | `hooks/useContentBlocks.ts` | Block state management (images only) |
 | Types | `types/content.ts`, `types/imageGeneration.ts` | All type definitions |
 
 #### Integration Flow
@@ -625,7 +623,7 @@ A full-screen modal experience for image generation with selection, editing, and
 2. User approves → `useImageModal.startGeneration()` opens modal
 3. Modal shows loading animation → generates 3 variations per placement
 4. User selects/skips/edits images → clicks "Apply"
-5. `onImagesApplied` creates `ContentBlock[]` → renders in draggable preview
+5. `onImagesApplied` stores images in `ContentBlock[]`
 
 #### Remaining Work (Phase 10 - Polish)
 - Test edge cases and error handling
@@ -745,7 +743,7 @@ You are an expert content writer for Enboarder...
 | `src/hooks/useCompanySettings.ts` | Company settings + intelligent URL scanning |
 | `src/hooks/useImagePlanning.ts` | Conversational image planning state machine |
 | `src/hooks/useImageModal.ts` | Image generation modal state machine |
-| `src/hooks/useContentBlocks.ts` | Content block state with drag-drop reordering |
+| `src/hooks/useContentBlocks.ts` | Content block state for image storage |
 | `src/hooks/usePageEditor.ts` | Page editing with auto title generation |
 | `tasks/page-save-improvements.md` | Known issues and future work for page saving |
 | `src/services/api.ts` | API client with JWT interceptor + streaming |
@@ -757,10 +755,9 @@ You are an expert content writer for Enboarder...
 | `src/components/chat/ChatMessage.tsx` | Chat bubble with markdown support, inline image hover actions |
 | `src/components/chat/ChatInput.tsx` | Chat input with embedded style dropdown, generate imagery, +/mic/send |
 | `src/components/modals/InlineImageEditModal.tsx` | Edit images with reference + prompt |
-| `src/components/preview/ContentPreview.tsx` | Preview pane with markdown rendering |
+| `src/components/preview/ContentPreview.tsx` | Markdown preview with click-to-edit inline editing |
 | `src/components/preview/ImageCard.tsx` | Displays 3 image variations for header/body |
 | `src/components/modals/` | Image generation modal components (5 files) |
-| `src/components/content/` | Draggable content components (4 files) |
 | `src/components/screens/PageEditorScreen.tsx` | Chat + preview split view for content creation |
 | `src/components/screens/PagesScreen.tsx` | Pages grid with thumbnail cards |
 | `src/components/pages/PageCard.tsx` | Thumbnail card with image preview, content stats |

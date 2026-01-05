@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 
 const URL_REGEX = /^(https?:\/\/[^\s]+)$/i;
 
@@ -23,6 +23,23 @@ export const useInputDetection = (value: string) => {
 
 export const useFileDropzone = () => {
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Prevent browser from opening files dropped anywhere on the page
+  useEffect(() => {
+    const preventDefaults = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    // Add listeners to document to prevent browser default behavior
+    document.addEventListener('dragover', preventDefaults);
+    document.addEventListener('drop', preventDefaults);
+
+    return () => {
+      document.removeEventListener('dragover', preventDefaults);
+      document.removeEventListener('drop', preventDefaults);
+    };
+  }, []);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -53,18 +70,19 @@ export const useFileDropzone = () => {
     const validFiles = files.filter(file => {
       const validTypes = [
         'application/pdf',
-        'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'text/plain',
-        'application/vnd.ms-powerpoint',
+        'text/markdown',
         'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       ];
-      return validTypes.includes(file.type) || 
-        file.name.endsWith('.pdf') || 
-        file.name.endsWith('.docx') || 
-        file.name.endsWith('.doc') ||
+      return validTypes.includes(file.type) ||
+        file.name.endsWith('.pdf') ||
+        file.name.endsWith('.docx') ||
         file.name.endsWith('.txt') ||
-        file.name.endsWith('.pptx');
+        file.name.endsWith('.md') ||
+        file.name.endsWith('.pptx') ||
+        file.name.endsWith('.xlsx');
     });
 
     if (validFiles.length > 0) {

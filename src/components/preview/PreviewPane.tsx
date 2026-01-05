@@ -4,7 +4,6 @@ import { ContentSkeleton } from './ContentSkeleton';
 import { EmptyPreview } from './EmptyPreview';
 import { ImageCard } from './ImageCard';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { DraggableContentPreview } from '@/components/content';
 import type { ContentBlock } from '@/types/content';
 
 export interface GeneratedImageSet {
@@ -25,10 +24,11 @@ interface PreviewPaneProps {
   onNavigateToVoice: () => void;
   onRegenerate: () => void;
   onRegenerateImage?: (index: number) => void;
-  // New props for planned images (legacy flow)
+  onTextChange?: (text: string) => void;
+  // Legacy props for planned images
   plannedImages?: GeneratedImageSet[];
   isGeneratingImages?: boolean;
-  // New props for content blocks (Phase 9)
+  // Props for content blocks (kept for compatibility but simplified)
   contentBlocks?: ContentBlock[];
   onReorderBlocks?: (fromIndex: number, toIndex: number) => void;
   onDeleteBlock?: (blockId: string) => void;
@@ -43,16 +43,13 @@ export const PreviewPane = ({
   onNavigateToVoice,
   onRegenerate,
   onRegenerateImage,
+  onTextChange,
   plannedImages = [],
   isGeneratingImages = false,
   contentBlocks = [],
-  onReorderBlocks,
-  onDeleteBlock,
-  onUpdateBlock,
   pageTitle = 'Untitled',
 }: PreviewPaneProps) => {
   const hasContent = content.text.length > 0;
-  const hasContentBlocks = contentBlocks.length > 0;
 
   // Separate images by placement (legacy flow)
   const headerImages = plannedImages.filter((img) => img.placement === 'top');
@@ -73,54 +70,43 @@ export const PreviewPane = ({
 
       <ScrollArea className="flex-1">
         <div className="p-6 space-y-6">
-          {/* If we have content blocks (from image modal), render draggable preview */}
-          {hasContentBlocks ? (
-            <DraggableContentPreview
-              blocks={contentBlocks}
-              onReorder={onReorderBlocks || (() => {})}
-              onDeleteImage={onDeleteBlock || (() => {})}
-              onUpdateBlock={onUpdateBlock}
+          {/* Header Images (at top) */}
+          {headerImages.map((imgSet) => (
+            <ImageCard
+              key={imgSet.recommendationId}
+              title={imgSet.title}
+              type={imgSet.type}
+              aspectRatio={imgSet.aspectRatio}
+              images={imgSet.images}
+              isGenerating={isGeneratingImages && imgSet.images.length === 0}
+            />
+          ))}
+
+          {/* Main Content */}
+          {isGenerating ? (
+            <ContentSkeleton />
+          ) : hasContent ? (
+            <ContentPreview
+              text={content.text}
+              images={content.images}
+              onRegenerateImage={onRegenerateImage}
+              onTextChange={onTextChange}
             />
           ) : (
-            <>
-              {/* Header Images (at top) - legacy flow */}
-              {headerImages.map((imgSet) => (
-                <ImageCard
-                  key={imgSet.recommendationId}
-                  title={imgSet.title}
-                  type={imgSet.type}
-                  aspectRatio={imgSet.aspectRatio}
-                  images={imgSet.images}
-                  isGenerating={isGeneratingImages && imgSet.images.length === 0}
-                />
-              ))}
-
-              {/* Main Content */}
-              {isGenerating ? (
-                <ContentSkeleton />
-              ) : hasContent ? (
-                <ContentPreview
-                  text={content.text}
-                  images={content.images}
-                  onRegenerateImage={onRegenerateImage}
-                />
-              ) : (
-                <EmptyPreview />
-              )}
-
-              {/* Body Images (at bottom) - legacy flow */}
-              {bodyImages.map((imgSet) => (
-                <ImageCard
-                  key={imgSet.recommendationId}
-                  title={imgSet.title}
-                  type={imgSet.type}
-                  aspectRatio={imgSet.aspectRatio}
-                  images={imgSet.images}
-                  isGenerating={isGeneratingImages && imgSet.images.length === 0}
-                />
-              ))}
-            </>
+            <EmptyPreview />
           )}
+
+          {/* Body Images (at bottom) */}
+          {bodyImages.map((imgSet) => (
+            <ImageCard
+              key={imgSet.recommendationId}
+              title={imgSet.title}
+              type={imgSet.type}
+              aspectRatio={imgSet.aspectRatio}
+              images={imgSet.images}
+              isGenerating={isGeneratingImages && imgSet.images.length === 0}
+            />
+          ))}
         </div>
       </ScrollArea>
     </div>

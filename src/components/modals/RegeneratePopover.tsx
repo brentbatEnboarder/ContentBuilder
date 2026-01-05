@@ -76,9 +76,9 @@ export const RegeneratePopover = ({
       return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
     }
 
-    const popoverWidth = 360;
-    const popoverHeight = 280; // Approximate height
-    const margin = 8;
+    const popoverWidth = 480;
+    const popoverHeight = 380; // Approximate height
+    const margin = 16;
 
     let top = anchorRect.bottom + margin;
     let left = anchorRect.left + anchorRect.width / 2 - popoverWidth / 2;
@@ -109,7 +109,7 @@ export const RegeneratePopover = ({
           {/* Popover */}
           <motion.div
             ref={popoverRef}
-            className="fixed z-[121] w-[360px] bg-background rounded-xl shadow-2xl border border-border overflow-hidden"
+            className="fixed z-[121] w-[480px] bg-background rounded-xl shadow-2xl border border-border overflow-hidden"
             style={getPopoverStyle()}
             initial={{ opacity: 0, scale: 0.95, y: -10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -122,10 +122,10 @@ export const RegeneratePopover = ({
               style={{ zIndex: -1 }}
             />
 
-            <div className="p-5 space-y-4">
+            <div className="p-6 space-y-5">
               {/* Header */}
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-foreground">
+                <h3 className="text-lg font-semibold text-foreground">
                   Regenerate {placementLabel} Images
                 </h3>
                 <StyleDropdown onNavigateToSettings={() => {}} />
@@ -133,33 +133,33 @@ export const RegeneratePopover = ({
 
               {/* Current Prompt */}
               <div>
-                <label className="block text-xs text-muted-foreground mb-1.5">Current prompt:</label>
-                <div className="p-2.5 bg-muted/50 border border-border rounded-lg text-sm text-foreground line-clamp-2">
+                <label className="block text-sm text-muted-foreground mb-2">Current prompt:</label>
+                <div className="p-3 bg-muted/50 border border-border rounded-lg text-sm text-foreground line-clamp-3">
                   {currentPrompt}
                 </div>
               </div>
 
               {/* Edit Prompt */}
               <div>
-                <label className="block text-xs text-muted-foreground mb-1.5">
+                <label className="block text-sm text-muted-foreground mb-2">
                   Modify prompt (optional):
                 </label>
                 <Textarea
                   ref={textareaRef}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  rows={3}
+                  rows={5}
                   className="resize-none text-sm"
                   placeholder="Edit the prompt to get different results..."
                 />
               </div>
 
               {/* Actions */}
-              <div className="flex items-center justify-end gap-3 pt-1">
-                <Button variant="ghost" size="sm" onClick={onClose}>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <Button variant="ghost" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button size="sm" onClick={handleRegenerate}>
+                <Button onClick={handleRegenerate}>
                   Regenerate
                 </Button>
               </div>

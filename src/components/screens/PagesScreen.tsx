@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { PageCard } from '@/components/pages/PageCard';
 import { EmptyPagesState } from '@/components/pages/EmptyPagesState';
 import { DeletePageDialog } from '@/components/pages/DeletePageDialog';
@@ -15,10 +16,29 @@ interface PagesScreenProps {
   onCreatePage?: () => void;
 }
 
+// Skeleton card component for loading state
+const PageCardSkeleton = () => (
+  <div className="bg-card border border-border rounded-xl overflow-hidden">
+    {/* Thumbnail skeleton */}
+    <Skeleton className="w-full h-32" />
+    {/* Content skeleton */}
+    <div className="p-4 space-y-3">
+      <Skeleton className="h-5 w-3/4" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-2/3" />
+      <div className="flex justify-between pt-2">
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-4 w-16" />
+      </div>
+    </div>
+  </div>
+);
+
 export const PagesScreen = ({ onEditPage, onCreatePage }: PagesScreenProps) => {
   const {
     pages,
     allPages,
+    isLoading,
     searchQuery,
     setSearchQuery,
     createPage,
@@ -84,6 +104,28 @@ export const PagesScreen = ({ onEditPage, onCreatePage }: PagesScreenProps) => {
   const handleDeleteCancel = () => {
     setDeleteDialog({ open: false, page: null });
   };
+
+  // Show loading state with skeletons
+  if (isLoading) {
+    return (
+      <div className="p-8 max-w-6xl mx-auto">
+        {/* Search and Create skeleton */}
+        <div className="flex gap-3 mb-6">
+          <div className="relative flex-1">
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <Skeleton className="h-10 w-40" />
+        </div>
+
+        {/* Page Grid skeletons */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <PageCardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const isEmpty = allPages.length === 0;
   const noResults = pages.length === 0 && searchQuery.length > 0;

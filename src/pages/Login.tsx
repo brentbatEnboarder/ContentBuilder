@@ -1,30 +1,28 @@
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+// import { useState } from 'react';
+// import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login, loginWithGoogle, error, clearError } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  // Email/password state - commented out, Google OAuth only
+  // const [email, setEmail] = useState('');
+  // const [password, setPassword] = useState('');
+  // const [isSubmitting, setIsSubmitting] = useState(false);
+  const { loginWithGoogle, error, clearError } = useAuth();
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
+  // const navigate = useNavigate();
+  // const location = useLocation();
+  // const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    clearError();
-
-    const { error } = await login(email, password);
-
-    if (!error) {
-      navigate(from, { replace: true });
-    }
-
-    setIsSubmitting(false);
-  };
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setIsSubmitting(true);
+  //   clearError();
+  //   const { error } = await login(email, password);
+  //   if (!error) {
+  //     navigate(from, { replace: true });
+  //   }
+  //   setIsSubmitting(false);
+  // };
 
   const handleGoogleLogin = async () => {
     clearError();
@@ -34,9 +32,9 @@ export function Login() {
   return (
     <div className="min-h-screen flex">
       {/* Left side - Login form */}
-      <div className="w-full lg:w-1/2 flex flex-col bg-[#1a1625]">
+      <div className="w-full lg:w-1/2 flex flex-col justify-center bg-[#1a1625]">
         {/* Logo section */}
-        <div className="pt-24 lg:pt-32 px-8 lg:px-12 flex justify-center">
+        <div className="px-8 lg:px-12 flex justify-center">
           <img
             src="/enboarder-Logos-stack-colour-white-R.png"
             alt="Enboarder"
@@ -54,8 +52,8 @@ export function Login() {
           </p>
         </div>
 
-        {/* Form section - centered vertically */}
-        <div className="flex-1 flex items-center justify-center px-8 lg:px-12 py-8">
+        {/* Form section */}
+        <div className="flex items-center justify-center px-8 lg:px-12 pt-32 pb-12">
           <div className="w-full max-w-md space-y-6">
             {error && (
               <div className="rounded-md bg-red-500/10 border border-red-500/20 p-4 text-sm text-red-400">
@@ -90,7 +88,7 @@ export function Login() {
               Continue with Google
             </button>
 
-            {/* Divider */}
+            {/* Email/Password sign-in disabled - Google OAuth only
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-600" />
@@ -100,7 +98,6 @@ export function Login() {
               </div>
             </div>
 
-            {/* Email/Password Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-300">
@@ -144,6 +141,7 @@ export function Login() {
                 {isSubmitting ? 'Signing in...' : 'Sign in'}
               </button>
             </form>
+            */}
           </div>
         </div>
       </div>

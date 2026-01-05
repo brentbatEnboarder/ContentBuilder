@@ -178,6 +178,10 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 86. **Page Editor Styling Refresh** - Coral CTAs (Generate Imagery), teal Regenerate button, purple Send, reduced purple overuse
 87. **Stricter Target Word Length** - Prompt now enforces ±10% range (e.g., 450-550 for 500 target) instead of soft guidance
 88. **Regenerate Button Fix** - Now regenerates text content instead of triggering image generation flow
+89. **Style Dropdown Fix** - Fixed stale closure bug where changing style didn't update for image generation
+90. **Image Streaming Rewrite** - Queue-based approach fixes missing images in parallel generation
+91. **Page Save Spinner** - Shows "Saving..." spinner in header when saving pages
+92. **Google OAuth Only** - Email/password login disabled, Google OAuth is the only sign-in method
 
 ## Environment Variables
 

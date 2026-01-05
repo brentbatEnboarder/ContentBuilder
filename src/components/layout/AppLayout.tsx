@@ -1,4 +1,5 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { LeftNav } from './LeftNav';
 import { TopHeader } from './TopHeader';
 import { WizardBanner } from '@/components/onboarding/WizardBanner';
@@ -23,6 +24,9 @@ const stepToScreen: Record<OnboardingStep, ScreenType> = {
 };
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
+  const location = useLocation();
+  const hasSetInitialScreen = useRef(false);
+
   const {
     isNavCollapsed,
     activeScreen,
@@ -34,7 +38,23 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     goToPages,
   } = useNavigation();
 
-  const { isOnboarding, currentStep } = useOnboarding();
+  const { isOnboarding, currentStep, isLoading: isOnboardingLoading } = useOnboarding();
+
+  // Handle initial screen based on navigation state
+  // For existing customers (not in onboarding), go directly to pages
+  useEffect(() => {
+    if (hasSetInitialScreen.current || isOnboardingLoading) return;
+
+    const state = location.state as { isExistingCustomer?: boolean } | null;
+
+    if (state?.isExistingCustomer && !isOnboarding) {
+      setActiveScreen('pages');
+      hasSetInitialScreen.current = true;
+    } else if (!isOnboarding) {
+      // Not an existing customer selection and not onboarding - stay on company
+      hasSetInitialScreen.current = true;
+    }
+  }, [location.state, isOnboarding, isOnboardingLoading, setActiveScreen]);
 
   // Sync navigation with onboarding step
   useEffect(() => {
@@ -64,6 +84,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       case 'new-page':
         return (
           <PageEditorScreen
+            key="new-page"
             pageId={null}
             onBack={goToPages}
             onNavigate={setActiveScreen}
@@ -72,6 +93,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       case 'page-editor':
         return (
           <PageEditorScreen
+            key={`edit-${editingPageId}`}
             pageId={editingPageId}
             onBack={goToPages}
             onNavigate={setActiveScreen}

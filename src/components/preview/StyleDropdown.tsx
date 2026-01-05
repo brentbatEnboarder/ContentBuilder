@@ -23,7 +23,7 @@ const styleLabels: Record<ImageStyleType, string> = {
   handdrawn: 'Hand-drawn',
   photorealistic: 'Photorealistic',
   minimalist: 'Minimalist',
-  warm: 'Warm',
+  infographic: 'Infographic',
 };
 
 export const StyleDropdown = ({ onNavigateToSettings, onStyleChange }: StyleDropdownProps) => {

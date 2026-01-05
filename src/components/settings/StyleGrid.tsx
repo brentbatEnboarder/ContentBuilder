@@ -52,10 +52,10 @@ const styleOptions: StyleOption[] = [
     image: '/styles/minimalist.jpg',
   },
   {
-    style: 'warm',
-    label: 'Warm',
-    description: 'Soft colors, cozy feel',
-    image: '/styles/warm.jpg',
+    style: 'infographic',
+    label: 'Infographic',
+    description: 'Data viz, diagrams',
+    image: '/styles/infographic.jpg',
   },
 ];
 

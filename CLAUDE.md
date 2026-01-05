@@ -182,6 +182,12 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 90. **Image Streaming Rewrite** - Queue-based approach fixes missing images in parallel generation
 91. **Page Save Spinner** - Shows "Saving..." spinner in header when saving pages
 92. **Google OAuth Only** - Email/password login disabled, Google OAuth is the only sign-in method
+93. **Infographic Image Style** - Replaced "Warm" style with "Infographic" for data visualization, diagrams, and icons
+94. **Customer Selection Toolbar** - Sticky toolbar anchored below header, doesn't scroll with customer list
+95. **Tab Stability Fix** - Disabled React Query refetchOnWindowFocus/refetchOnReconnect to prevent disrupting scans
+96. **Existing Customer Navigation** - Selecting existing customer lands on Pages screen instead of Company Info
+97. **Page Editor Key Fix** - Added React keys to force remount when switching between new/existing pages
+98. **Word Count Contrast** - Added darker teal-text color variant (35% lightness) for better readability
 
 ## Environment Variables
 

@@ -97,7 +97,8 @@ export function CustomerSelection() {
   const handleSelect = (customer: Customer) => {
     selectCustomer(customer);
     toast.success(`Working with ${customer.name}`);
-    navigate('/');
+    // Existing customer - navigate to pages (unless onboarding not complete)
+    navigate('/', { state: { isExistingCustomer: true } });
   };
 
   const handleCreate = async () => {
@@ -193,17 +194,16 @@ export function CustomerSelection() {
         </div>
       </header>
 
-      {/* Content */}
-      <main className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-2xl">
+      {/* Toolbar - Anchored below header */}
+      <div className="sticky top-0 z-10 bg-gradient-to-b from-slate-50 via-white to-transparent pt-6 pb-4">
+        <div className="max-w-2xl mx-auto px-8">
           {error && (
-            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
+            <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
               {error}
             </div>
           )}
 
-          {/* Toolbar */}
-          <div className="flex items-center gap-3 mb-5">
+          <div className="flex items-center gap-3">
             {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -239,7 +239,12 @@ export function CustomerSelection() {
               New Customer
             </Button>
           </div>
+        </div>
+      </div>
 
+      {/* Content - Scrollable area */}
+      <main className="flex-1 overflow-auto px-8 pb-8">
+        <div className="max-w-2xl mx-auto">
           {/* Create New Customer Form */}
           {showCreate && (
             <Card className="p-5 bg-white border-primary/30 shadow-lg shadow-primary/5 rounded-xl mb-5">

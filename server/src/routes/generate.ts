@@ -684,7 +684,7 @@ router.post('/images', async (req: Request, res: Response) => {
       'handdrawn',
       'photorealistic',
       'minimalist',
-      'warm',
+      'infographic',
     ];
     if (!validStyles.includes(styleId)) {
       res.status(400).json({
@@ -830,7 +830,7 @@ router.post('/images/stream', async (req: Request, res: Response) => {
       'handdrawn',
       'photorealistic',
       'minimalist',
-      'warm',
+      'infographic',
     ];
     if (!validStyles.includes(styleId)) {
       res.status(400).json({

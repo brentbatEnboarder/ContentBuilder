@@ -15,7 +15,7 @@ describe('imageGen service', () => {
         'handdrawn',
         'photorealistic',
         'minimalist',
-        'warm',
+        'infographic',
       ];
 
       expect(Object.keys(styleToPrompt)).toHaveLength(8);
@@ -62,9 +62,9 @@ describe('imageGen service', () => {
         /minimalist|minimal|simple|clean/
       );
 
-      // Warm should mention friendly/warm
-      expect(styleToPrompt.warm.toLowerCase()).toMatch(
-        /warm|friendly|soft|inviting/
+      // Infographic should mention data/diagram/visual
+      expect(styleToPrompt.infographic.toLowerCase()).toMatch(
+        /infographic|data|diagram|icon|chart/
       );
     });
   });
@@ -105,7 +105,7 @@ describe('imageGen service', () => {
 
       const prompt = buildImagePrompt(
         contentSummary,
-        'warm',
+        'infographic',
         undefined,
         customPrompt
       );
@@ -166,7 +166,7 @@ describe('imageGen service', () => {
 
       const prompt = buildImagePrompt(
         contentSummary,
-        'warm',
+        'infographic',
         undefined,
         customPrompt
       );

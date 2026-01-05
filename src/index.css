@@ -55,6 +55,7 @@
     --coral-foreground: 0 0% 100%;
     --teal: 167 81% 65%;
     --teal-hover: 167 81% 55%;
+    --teal-text: 167 81% 35%;
     --teal-foreground: 0 0% 100%;
     --golden: 43 100% 56%;
     --golden-hover: 43 100% 46%;
@@ -121,6 +122,7 @@
     --coral-foreground: 0 0% 100%;
     --teal: 167 81% 65%;
     --teal-hover: 167 81% 70%;
+    --teal-text: 167 81% 55%;
     --teal-foreground: 0 0% 100%;
     --golden: 43 100% 56%;
     --golden-hover: 43 100% 65%;

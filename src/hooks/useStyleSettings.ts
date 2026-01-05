@@ -11,7 +11,7 @@ export type ImageStyleType =
   | 'handdrawn'
   | 'photorealistic'
   | 'minimalist'
-  | 'warm';
+  | 'infographic';
 
 export interface StyleSettings {
   selectedStyle: ImageStyleType;

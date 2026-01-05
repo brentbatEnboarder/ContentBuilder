@@ -902,7 +902,7 @@ When in doubt, DO NOT use this tool. Generate text content instead.`,
       },
       style: {
         type: 'string',
-        enum: ['corporate', 'flat', 'isometric', 'abstract', 'handdrawn', 'photorealistic', 'minimalist', 'warm'],
+        enum: ['corporate', 'flat', 'isometric', 'abstract', 'handdrawn', 'photorealistic', 'minimalist', 'infographic'],
         description: 'The visual style for the image. Defaults to the user\'s configured style if not specified.',
       },
       aspectRatio: {

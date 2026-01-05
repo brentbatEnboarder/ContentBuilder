@@ -67,6 +67,7 @@ export default {
         teal: {
           DEFAULT: "hsl(var(--teal))",
           hover: "hsl(var(--teal-hover))",
+          text: "hsl(var(--teal-text))",
           foreground: "hsl(var(--teal-foreground))",
         },
         golden: {

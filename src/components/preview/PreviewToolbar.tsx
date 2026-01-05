@@ -133,11 +133,11 @@ export const PreviewToolbar = ({
         {/* Word count badge with teal accent */}
         {hasContent && (
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-teal/10 border border-teal/20">
-            <FileText className="w-3 h-3 text-teal" />
-            <span className="text-xs font-semibold text-teal tabular-nums">
+            <FileText className="w-3 h-3 text-teal-text" />
+            <span className="text-xs font-semibold text-teal-text tabular-nums">
               {wordCount.toLocaleString()}
             </span>
-            <span className="text-xs text-teal/70">
+            <span className="text-xs text-teal-text/80">
               {wordCount === 1 ? 'word' : 'words'}
             </span>
           </div>

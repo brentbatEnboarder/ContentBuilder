@@ -73,11 +73,12 @@ export const styleToPrompt: Record<string, string> = {
     'Clean, uncluttered composition with subtle color palette. ' +
     'Elegant simplicity that focuses attention on key subjects.',
 
-  warm:
-    'Warm and friendly illustration style with soft, inviting colors. ' +
-    'Gentle gradients, rounded shapes, and approachable characters. ' +
-    'Cozy aesthetic with pastel tones and welcoming atmosphere. ' +
-    'Perfect for human-centered content and emotional storytelling.',
+  infographic:
+    'Clean infographic style with clear data visualization and information hierarchy. ' +
+    'Use icons, charts, diagrams, and visual metaphors to communicate concepts. ' +
+    'Organized layout with sections, numbered steps, or flow diagrams. ' +
+    'Professional typography with clear headings and concise labels. ' +
+    'Modern flat design aesthetic suitable for business communications and training materials.',
 };
 
 // Lazy-initialized Gemini client

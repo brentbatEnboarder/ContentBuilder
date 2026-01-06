@@ -336,11 +336,16 @@ function parseMarkdownToParagraphs(markdown: string): Paragraph[] {
 /**
  * Get image dimensions based on aspect ratio
  * Returns width and height in EMUs (English Metric Units) - Word's internal unit
- * 1 inch = 914400 EMUs, max width ~6 inches for letter paper with margins
+ * 1 inch = 914400 EMUs
+ * Max width ~6 inches for letter paper with margins
+ * Max height ~8 inches to leave room for page content
  */
 function getImageDimensions(aspectRatio: string): { width: number; height: number } {
+  const emuPerInch = 914400;
   const maxWidthInches = 6;
-  const maxWidthEMU = maxWidthInches * 914400;
+  const maxHeightInches = 8;
+  const maxWidthEMU = maxWidthInches * emuPerInch;
+  const maxHeightEMU = maxHeightInches * emuPerInch;
 
   const ratioMap: Record<string, number> = {
     '21:9': 21 / 9,
@@ -352,8 +357,31 @@ function getImageDimensions(aspectRatio: string): { width: number; height: numbe
   };
 
   const ratio = ratioMap[aspectRatio] || 16 / 9;
-  const width = maxWidthEMU;
-  const height = Math.round(width / ratio);
+
+  let width: number;
+  let height: number;
+
+  if (ratio >= 1) {
+    // Landscape or square: constrain by width
+    width = maxWidthEMU;
+    height = Math.round(width / ratio);
+
+    // If height exceeds max, scale down
+    if (height > maxHeightEMU) {
+      height = maxHeightEMU;
+      width = Math.round(height * ratio);
+    }
+  } else {
+    // Portrait: constrain by height first to prevent distortion
+    height = maxHeightEMU;
+    width = Math.round(height * ratio);
+
+    // If width exceeds max, scale down
+    if (width > maxWidthEMU) {
+      width = maxWidthEMU;
+      height = Math.round(width / ratio);
+    }
+  }
 
   return { width, height };
 }

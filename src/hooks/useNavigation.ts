@@ -6,6 +6,7 @@ interface NavigationState {
   isNavCollapsed: boolean;
   activeScreen: ScreenType;
   editingPageId: string | null;
+  newPageKey: number; // Unique key to force remount of new page editor
   toggleNav: () => void;
   setActiveScreen: (screen: ScreenType) => void;
   editPage: (pageId: string) => void;
@@ -17,6 +18,7 @@ export const useNavigation = (): NavigationState => {
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [activeScreen, setActiveScreen] = useState<ScreenType>('company');
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
+  const [newPageKey, setNewPageKey] = useState(0); // Increment to force remount
 
   const toggleNav = useCallback(() => {
     setIsNavCollapsed(prev => !prev);
@@ -36,6 +38,7 @@ export const useNavigation = (): NavigationState => {
 
   const createNewPage = useCallback(() => {
     setEditingPageId(null);
+    setNewPageKey(prev => prev + 1); // Increment key to force fresh mount
     setActiveScreen('new-page');
   }, []);
 
@@ -48,6 +51,7 @@ export const useNavigation = (): NavigationState => {
     isNavCollapsed,
     activeScreen,
     editingPageId,
+    newPageKey,
     toggleNav,
     setActiveScreen: handleSetActiveScreen,
     editPage,

@@ -31,6 +31,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     isNavCollapsed,
     activeScreen,
     editingPageId,
+    newPageKey,
     toggleNav,
     setActiveScreen,
     editPage,
@@ -84,7 +85,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       case 'new-page':
         return (
           <PageEditorScreen
-            key="new-page"
+            key={`new-page-${newPageKey}`}
             pageId={null}
             onBack={goToPages}
             onNavigate={setActiveScreen}

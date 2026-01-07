@@ -18,6 +18,7 @@ import { useImageModal } from '@/hooks/useImageModal';
 import { useContentBlocks } from '@/hooks/useContentBlocks';
 import { useStyleSettings } from '@/hooks/useStyleSettings';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useMockupGenerator } from '@/hooks/useMockupGenerator';
 import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import {
   ImageGenerationModal,
@@ -26,6 +27,8 @@ import {
   EditImagePanel,
   RegeneratePopover,
   InlineImageEditModal,
+  MockupSelectionModal,
+  MockupResultsModal,
 } from '@/components/modals';
 import { toast } from 'sonner';
 import { apiClient } from '@/services/api';
@@ -68,7 +71,11 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     blocks,
     setAllBlocks,
     addBlock,
+    deleteBlock,
   } = useContentBlocks();
+
+  // State for editing content block images
+  const [editingImageBlock, setEditingImageBlock] = useState<(ContentBlock & { type: 'image' }) | null>(null);
 
   // Image planning hook (conversational flow)
   const {
@@ -77,8 +84,10 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     isGenerating: isGeneratingImagesLegacy,
     startPlanning,
     sendPlanMessage,
-    getRecommendationsForModal,
   } = useImagePlanning();
+
+  // Mockup generator hook
+  const mockupGenerator = useMockupGenerator();
 
   // Image modal hook (selection UI)
   const imageModal = useImageModal({
@@ -245,8 +254,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
           isImagePlanningRef.current = false;
           addMessage('assistant', "Great! Opening the image generator. I'll create 3 variations for each placement so you can choose your favorites.");
 
-          // Get recommendations and start modal generation
-          const recommendations = getRecommendationsForModal();
+          // Use recommendations from result (fresh data), NOT getRecommendationsForModal() (stale state)
           const brandColors = companySettings.colors
             ? {
                 primary: companySettings.colors.primary,
@@ -255,9 +263,9 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
               }
             : undefined;
 
-          console.log('[PageEditorScreen] Starting image generation with style:', styleSettings.selectedStyle);
+          console.log('[PageEditorScreen] Starting image generation with', result.recommendations.length, 'recommendations, style:', styleSettings.selectedStyle);
           imageModal.startGeneration(
-            recommendations,
+            result.recommendations,
             styleSettings.selectedStyle,
             brandColors
           );
@@ -275,7 +283,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
       sendMessage(message, attachments);
     }
     setTimeout(() => setIsGenerating(false), 1500);
-  }, [imagePlanState, sendPlanMessage, generatedContent.text, getRecommendationsForModal, companySettings.colors, styleSettings.selectedStyle, imageModal, addMessage, setIsGenerating, sendMessage, sendMessageWithFiles]);
+  }, [imagePlanState, sendPlanMessage, generatedContent.text, companySettings.colors, styleSettings.selectedStyle, imageModal, addMessage, setIsGenerating, sendMessage, sendMessageWithFiles]);
 
   // Start image planning when "Generate Imagery" is clicked
   const handleGenerateImages = useCallback(async () => {
@@ -350,7 +358,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
         isImagePlanningRef.current = false;
         addMessage('assistant', "Great! Opening the image generator. I'll create 3 variations for each placement so you can choose your favorites.");
 
-        const recommendations = getRecommendationsForModal();
+        // Use recommendations from result (fresh data), NOT getRecommendationsForModal() (stale state)
         const brandColors = companySettings.colors
           ? {
               primary: companySettings.colors.primary,
@@ -359,14 +367,15 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
             }
           : undefined;
 
+        console.log('[PageEditorScreen] Button: Starting image generation with', result.recommendations.length, 'recommendations');
         imageModal.startGeneration(
-          recommendations,
+          result.recommendations,
           styleSettings.selectedStyle,
           brandColors
         );
       }
     }
-  }, [imagePlanState, sendPlanMessage, generatedContent.text, getRecommendationsForModal, companySettings.colors, styleSettings.selectedStyle, imageModal, addMessage]);
+  }, [imagePlanState, sendPlanMessage, generatedContent.text, companySettings.colors, styleSettings.selectedStyle, imageModal, addMessage]);
 
   // Handle selecting an inline image to add to content blocks
   const handleSelectInlineImage = useCallback((imageUrl: string) => {
@@ -448,6 +457,104 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     }
   }, [editingInlineImage, setMessages]);
 
+  // Handle editing an image block (header/body images in preview)
+  const handleEditImageBlock = useCallback((block: ContentBlock & { type: 'image' }) => {
+    setEditingImageBlock(block);
+  }, []);
+
+  // Handle submitting an image block edit
+  const handleSubmitImageBlockEdit = useCallback(async (editPrompt: string): Promise<string | null> => {
+    if (!editingImageBlock) return null;
+
+    try {
+      const base64Data = editingImageBlock.imageUrl.startsWith('data:')
+        ? editingImageBlock.imageUrl.split(',')[1]
+        : editingImageBlock.imageUrl;
+
+      const result = await apiClient.editImage({
+        referenceImage: base64Data,
+        editPrompt,
+        aspectRatio: editingImageBlock.aspectRatio || '16:9',
+        placementType: editingImageBlock.placementType || 'body',
+      });
+
+      if (result.success && result.data) {
+        const newImageUrl = `data:${result.data.mimeType};base64,${result.data.base64Data}`;
+
+        // Update the block in content blocks
+        const updatedBlocks = blocks.map((b) =>
+          b.id === editingImageBlock.id && b.type === 'image'
+            ? { ...b, imageUrl: newImageUrl }
+            : b
+        );
+        setAllBlocks(updatedBlocks);
+
+        // Also update generatedContent
+        updateGeneratedContent({
+          text: generatedContent.text,
+          images: generatedContent.images.map((img) =>
+            img === editingImageBlock.imageUrl ? newImageUrl : img
+          ),
+          contentBlocks: updatedBlocks,
+        });
+
+        toast.success('Image updated!');
+        setEditingImageBlock(null);
+        return newImageUrl;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to edit image:', error);
+      throw error;
+    }
+  }, [editingImageBlock, blocks, setAllBlocks, updateGeneratedContent, generatedContent.text, generatedContent.images]);
+
+  // Handle deleting an image block
+  const handleDeleteImageBlock = useCallback((blockId: string) => {
+    deleteBlock(blockId);
+
+    // Also update generatedContent
+    const updatedBlocks = generatedContent.contentBlocks?.filter((b) => b.id !== blockId) || [];
+    const deletedBlock = generatedContent.contentBlocks?.find((b) => b.id === blockId);
+    const updatedImages = deletedBlock?.type === 'image'
+      ? generatedContent.images.filter((img) => img !== (deletedBlock as ContentBlock & { type: 'image' }).imageUrl)
+      : generatedContent.images;
+
+    updateGeneratedContent({
+      text: generatedContent.text,
+      images: updatedImages,
+      contentBlocks: updatedBlocks,
+    });
+
+    toast.success('Image deleted');
+  }, [deleteBlock, generatedContent, updateGeneratedContent]);
+
+  // Handle opening mockup selection modal
+  const handleOpenMockup = useCallback(() => {
+    if (!generatedContent.text) {
+      toast.error('No content to create mockup from');
+      return;
+    }
+    mockupGenerator.openSelection();
+  }, [generatedContent.text, mockupGenerator]);
+
+  // Handle mockup template selection
+  const handleMockupSelect = useCallback(async (template: { id: string; name: string; imagePath: string; description: string }) => {
+    await mockupGenerator.generateMockup(template, {
+      text: generatedContent.text,
+      contentBlocks: generatedContent.contentBlocks,
+    });
+  }, [mockupGenerator, generatedContent.text, generatedContent.contentBlocks]);
+
+  // Handle test capture (downloads the mobile-sized screenshot for debugging)
+  const handleTestCapture = useCallback(() => {
+    mockupGenerator.testCapture({
+      text: generatedContent.text,
+      contentBlocks: generatedContent.contentBlocks,
+    });
+  }, [mockupGenerator, generatedContent.text, generatedContent.contentBlocks]);
+
   if (!page) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -488,7 +595,11 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
             onNavigateToVoice={() => onNavigate('voice')}
             onRegenerate={handleRegenerateText}
             onTextChange={handleTextChange}
+            onMockup={handleOpenMockup}
+            onTestCapture={handleTestCapture}
             isGeneratingImages={isGeneratingImages}
+            onEditImageBlock={handleEditImageBlock}
+            onDeleteImageBlock={handleDeleteImageBlock}
             pageTitle={page?.title || 'Untitled'}
           />
         </div>
@@ -570,6 +681,42 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
         imageUrl={editingInlineImage}
         onSubmit={handleSubmitInlineEdit}
         onClose={() => setEditingInlineImage(null)}
+      />
+
+      {/* Image Block Edit Modal (for header/body images) */}
+      <InlineImageEditModal
+        isOpen={!!editingImageBlock}
+        imageUrl={editingImageBlock?.imageUrl || null}
+        onSubmit={handleSubmitImageBlockEdit}
+        onClose={() => setEditingImageBlock(null)}
+      />
+
+      {/* Mockup Selection Modal */}
+      <MockupSelectionModal
+        isOpen={mockupGenerator.isSelectionOpen}
+        onClose={mockupGenerator.closeSelection}
+        onSelect={handleMockupSelect}
+        isLoading={mockupGenerator.isCapturing}
+      />
+
+      {/* Mockup Results Modal */}
+      <MockupResultsModal
+        isOpen={mockupGenerator.isResultsOpen}
+        onClose={mockupGenerator.closeResults}
+        results={mockupGenerator.results}
+        isLoading={mockupGenerator.isGenerating}
+        loadingProgress={mockupGenerator.loadingProgress}
+        templateName={mockupGenerator.selectedTemplate?.name}
+        onEdit={mockupGenerator.openEdit}
+        onDelete={mockupGenerator.deleteMockup}
+      />
+
+      {/* Mockup Edit Modal */}
+      <InlineImageEditModal
+        isOpen={mockupGenerator.isEditOpen}
+        imageUrl={mockupGenerator.editingMockup?.imageUrl || null}
+        onSubmit={mockupGenerator.submitEdit}
+        onClose={mockupGenerator.closeEdit}
       />
 
       {/* Discard Changes Dialog */}

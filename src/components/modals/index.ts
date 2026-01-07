@@ -4,3 +4,5 @@ export { ImageLightbox } from './ImageLightbox';
 export { EditImagePanel } from './EditImagePanel';
 export { RegeneratePopover } from './RegeneratePopover';
 export { InlineImageEditModal } from './InlineImageEditModal';
+export { MockupSelectionModal } from './MockupSelectionModal';
+export { MockupResultsModal } from './MockupResultsModal';

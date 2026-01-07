@@ -50,7 +50,7 @@ app.use(helmet({
 const corsOrigin = isProduction ? true : FRONTEND_URL;
 app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(morgan(isProduction ? 'combined' : 'dev'));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
 
 // Health check
 app.get('/api/health', (_req: Request, res: Response) => {

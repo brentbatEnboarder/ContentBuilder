@@ -74,12 +74,14 @@ export const useImagePlanning = () => {
 
   /**
    * Send a message to continue the planning conversation
-   * Returns { message, isApproval } - message is AI response, isApproval indicates if user approved
+   * Returns { message, isApproval, recommendations } - recommendations is the UPDATED plan
+   * IMPORTANT: Always use the returned recommendations, not getRecommendationsForModal(),
+   * because React state updates are async and may not be reflected immediately.
    */
   const sendPlanMessage = useCallback(async (
     content: string,
     userMessage: string
-  ): Promise<{ message: string; isApproval: boolean } | null> => {
+  ): Promise<{ message: string; isApproval: boolean; recommendations: ImageRecommendation[] } | null> => {
     setError(null);
     setIsPlanningLoading(true);
 
@@ -123,7 +125,17 @@ export const useImagePlanning = () => {
         { role: 'assistant', content: result.message },
       ]);
 
-      return { message: result.message, isApproval };
+      // Return the fresh recommendations directly - don't rely on state which updates async
+      const formattedRecommendations = result.recommendations.map((rec) => ({
+        id: rec.id,
+        type: rec.type,
+        title: rec.title,
+        description: rec.description,
+        aspectRatio: rec.aspectRatio,
+        placement: rec.placement,
+      }));
+
+      return { message: result.message, isApproval, recommendations: formattedRecommendations };
     } catch (err) {
       console.error('Failed to continue image planning:', err);
       setError(err instanceof Error ? err.message : 'Failed to continue planning');

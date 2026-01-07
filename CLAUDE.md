@@ -63,6 +63,7 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 - **`useContentBlocks.ts`** - Content block state for image storage
 - **`usePageEditor.ts`** - Page editing state (auto-generates titles on first save)
 - **`useOnboardingHeaderActions.ts`** - Wraps header actions for onboarding wizard flow
+- **`useMockupGenerator.ts`** - Device mockup generation with screenshot capture, template selection, and Gemini compositing
 
 ### Backend Services (`/server/src/services`)
 - **`scraper.ts`** - Basic Firecrawl scraping (legacy)
@@ -84,6 +85,7 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 - **POST /api/generate/image-plan/continue** - Continue image planning conversation
 - **POST /api/generate/images** - Gemini image generation (parallel variations)
 - **POST /api/generate/images/stream** - SSE streaming image generation (returns each image as it completes)
+- **POST /api/generate/mockup** - Generate device mockup (single image, 16:9) from template + content screenshot
 - **POST /api/transcribe** - Whisper transcription
 - **POST /api/process/file** - File content extraction
 
@@ -197,6 +199,11 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 105. **Document-Level Drop Prevention** - Browser no longer opens files dropped anywhere on page
 106. **Aspect Ratio Normalization** - Frontend normalizes AI-recommended aspect ratios (e.g., `2:1` → `21:9`) to valid API values, fixing image generation failures
 107. **Simplified Inline Editing** - ContentPreview now has built-in click-to-edit functionality (hover shows "Click to edit", click opens markdown textarea, Esc cancels, click outside saves). Removed drag-drop content blocks in favor of simpler direct text editing.
+108. **Device Mockup Generator** - Generate phone mockups by compositing content onto device templates. Creates mobile-width render at iPhone resolution (1170×2532), sends to Gemini with detailed prompt for realistic screen reflections. 5 templates available. Results modal with hover edit/delete actions, PNG/JPEG download.
+109. **Image Block Hover Actions** - Header and body images in preview pane show edit/delete buttons on hover. Edit opens InlineImageEditModal, delete removes from content blocks.
+110. **Mockup Text Weight Fix** - Mobile render uses font-weight 300 for body text with antialiased smoothing, preventing heavy/bold appearance in device mockups.
+111. **2K Image Resolution** - All Gemini image generation upgraded from 1K to 2K (~2048px) for sharper images.
+112. **Image Planning Conversation Fix** - Prefill technique forces Claude to output `<image-plan>` JSON tags. React state timing fix ensures fresh recommendations are used when generating (not stale state).
 
 ## Environment Variables
 
@@ -648,16 +655,68 @@ type PlacementType = 'header' | 'body' | 'footer';
 #### Dependencies Added
 ```bash
 npm install framer-motion @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
+npm install html2canvas  # For device mockup screenshot capture
 ```
 
 ### Image Generation (Nano Banana Pro)
 - **Model:** `gemini-3-pro-image-preview` (Nano Banana Pro)
 - **API Timeout:** 180 seconds (image generation can take 60+ seconds)
-- **Resolution:** 1K (configurable in `server/src/services/imageGen.ts`)
+- **Resolution:** 2K (~2048px, configurable in `server/src/services/imageGen.ts`)
 - **Supported Aspect Ratios:** `1:1`, `16:9`, `4:3`, `3:2`, `9:16`, `21:9`
 - **Header images:** Always use `21:9` ultrawide
 - **Body images:** Use AI-recommended ratio from supported list
 - **Documentation:** See `3rd_Party_Docs/GEMINI_IMAGE_GENERATION_API.md`
+
+### Device Mockup Generator
+
+Generate professional device mockups by compositing content onto phone templates with realistic screen reflections.
+
+**Flow:**
+1. User clicks Mockup button (Smartphone icon) in preview toolbar
+2. MockupSelectionModal opens - user selects from 5 device templates
+3. Frontend creates a mobile-width render (1170×2532 iPhone resolution) of the content
+4. Template + content screenshot sent to Gemini for compositing
+5. Single mockup returned with realistic screen reflections matching the scene
+6. MockupResultsModal shows result with lightbox, edit/delete hover actions, PNG/JPEG download
+
+**Mockup Templates (in `/public/`):**
+- `Mock1.png` - Office Desk (hand holding phone)
+- `Mock2.png` - Coffee Shop (hand holding phone with coffee)
+- `Mock3.png` - City Night (two hands, bokeh lights)
+- `Mock4.png` - Floating Pro (gradient background)
+- `Mock5.png` - Purple Glow (floating with ambient light)
+
+**Mobile Content Render:**
+- Output: 1170×2532px (iPhone 14/15 native resolution)
+- Renders at 390px logical width with 3x scale for retina quality
+- Creates hidden DOM element, renders header image + formatted text, captures with html2canvas
+- Text reflows naturally for mobile width (not scaled-down desktop)
+- **Test button** (Flask icon, amber) downloads captured screenshot for debugging
+
+**Mockup Prompt (emphasizes realistic reflections):**
+The Gemini prompt specifically instructs:
+- Add subtle screen reflections matching the environment (windows, lamps, ambient light)
+- Semi-transparent reflections that let content show through
+- Match reflection intensity to ambient lighting
+- Color temperature matching between screen and environment
+- Goal: "looks like an actual photograph, not a digital composite"
+
+**Hover Actions on Generated Mockups:**
+- **Edit** (pencil) - Opens InlineImageEditModal to modify with a prompt
+- **Delete** (trash) - Removes the mockup from results
+
+**Key Files:**
+- `src/types/mockup.ts` - Types for templates, results, API
+- `src/hooks/useMockupGenerator.ts` - State machine with `captureContent()`, `testCapture()`, `generateMockup()`, `openEdit()`, `submitEdit()`, `deleteMockup()`
+- `src/components/modals/MockupSelectionModal.tsx` - Template picker grid
+- `src/components/modals/MockupResultsModal.tsx` - Results with hover actions, lightbox, download buttons
+- `server/src/services/imageGen.ts` - `generateMockup()` function
+- `server/src/routes/generate.ts` - `POST /api/generate/mockup` endpoint
+
+**Backend Config:**
+- JSON body limit: 50MB (in `server/src/index.ts`) to handle base64 images
+- Output aspect ratio: 16:9 (landscape mockup images)
+- Single image generation (not 3 variations) for faster results
 
 ### Parallel Image Generation
 Image generation uses a two-level parallelization strategy for maximum speed:
@@ -766,6 +825,10 @@ You are an expert content writer for Enboarder...
 | `src/contexts/OnboardingContext.tsx` | Onboarding wizard state, step tracking, first name extraction |
 | `src/components/onboarding/WizardBanner.tsx` | Progress dots banner with personalized greeting |
 | `src/hooks/useOnboardingHeaderActions.ts` | Wraps save to advance through wizard |
+| `src/hooks/useMockupGenerator.ts` | Device mockup generation state machine |
+| `src/types/mockup.ts` | MockupTemplate, MockupResult types |
+| `src/components/modals/MockupSelectionModal.tsx` | Template picker modal |
+| `src/components/modals/MockupResultsModal.tsx` | Results modal with lightbox + download |
 | `server/src/services/claude.ts` | Claude API with content tags, image planning, generate_image tool |
 | `server/src/services/imageGen.ts` | Gemini image generation + editImageWithReference |
 | `server/src/services/intelligentScraper.ts` | Multi-page Claude-directed scraper + parallel logo search |

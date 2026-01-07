@@ -618,6 +618,9 @@ Would you like to adjust any of these, or shall I go ahead and generate them?"`;
 
   messages.push({ role: 'user', content: userMessage });
 
+  // Use prefill technique to force Claude to start with <image-plan> tags
+  messages.push({ role: 'assistant', content: '<image-plan>\n[' });
+
   try {
     const response = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -631,7 +634,12 @@ Would you like to adjust any of these, or shall I go ahead and generate them?"`;
       throw new ClaudeError('No text in response', 'INVALID_RESPONSE');
     }
 
-    const fullResponse = textContent.text;
+    // Prepend the prefilled content to get the full response
+    const fullResponse = '<image-plan>\n[' + textContent.text;
+    console.log('[ImagePlanning] Initial plan response (with prefill):');
+    console.log('─'.repeat(60));
+    console.log(fullResponse);
+    console.log('─'.repeat(60));
 
     // Parse the image plan from the response
     const planMatch = fullResponse.match(/<image-plan>([\s\S]*?)<\/image-plan>/);
@@ -643,10 +651,13 @@ Would you like to adjust any of these, or shall I go ahead and generate them?"`;
         recommendations = JSON.parse(planMatch[1].trim());
         // Remove the image-plan tags from the message
         message = fullResponse.replace(/<image-plan>[\s\S]*?<\/image-plan>/g, '').trim();
+        console.log(`[ImagePlanning] Parsed ${recommendations.length} initial recommendations`);
       } catch (parseError) {
-        console.error('Failed to parse image plan JSON:', parseError);
-        // Continue with empty recommendations
+        console.error('[ImagePlanning] Failed to parse initial image plan JSON:', parseError);
+        console.error('[ImagePlanning] Raw JSON:', planMatch[1]);
       }
+    } else {
+      console.warn('[ImagePlanning] WARNING: No <image-plan> tags in initial response!');
     }
 
     return {
@@ -687,25 +698,40 @@ ${JSON.stringify(request.currentPlan || [], null, 2)}
 ${request.content.slice(0, 2000)}
 
 ## Instructions
-- If the user wants to modify images, update the plan accordingly
-- If the user says "go ahead", "generate", "looks good", "yes", or similar approval, respond with the SAME plan and a confirmation message
-- Always include the <image-plan> JSON block with the current/updated recommendations
-- Keep aspect ratios appropriate: 2:1 for headers, others based on content needs
+- If the user wants to MODIFY the plan (add, remove, or change images), you MUST update the JSON array to reflect their changes
+- If the user wants FEWER images, REMOVE items from the array - do not keep the original items
+- If the user wants DIFFERENT images, REPLACE the descriptions in the array
+- If the user says "go ahead", "generate", "looks good", "yes", or similar approval, respond with the SAME plan unchanged
+- Keep aspect ratios appropriate: 21:9 for headers, others based on content needs
 
-## Response Format
-Always respond with:
-1. <image-plan>[JSON array of recommendations]</image-plan>
-2. A conversational message using a **numbered list** for image recommendations
+## CRITICAL: Response Format
+Your response MUST start with the <image-plan> tags containing the UPDATED JSON array.
+If the user asked for changes, the JSON MUST reflect those changes - not the original plan.
 
-When presenting updated recommendations, use this format:
-"Here's the updated plan:
+<image-plan>
+[
+  {
+    "id": "img_1",
+    "type": "header",
+    "title": "Title here",
+    "description": "Full description here",
+    "aspectRatio": "21:9",
+    "placement": "top"
+  }
+]
+</image-plan>
 
-1. **Header: [Title]** - [Brief description]
-2. **Body: [Title]** - [Brief description]
+After the JSON, write a conversational message using a **numbered list** for image recommendations.
 
-[Follow-up question or confirmation]"
+Example when user asks for "only 1 header image":
+<image-plan>
+[{"id": "img_1", "type": "header", "title": "...", "description": "...", "aspectRatio": "21:9", "placement": "top"}]
+</image-plan>
 
-If approving generation, your message should confirm you're starting generation.`;
+Here's the updated plan:
+1. **Header: [Title]** - [Description]
+
+Shall I generate this image?`;
 
   const messages: Anthropic.MessageParam[] = [];
 
@@ -721,6 +747,10 @@ If approving generation, your message should confirm you're starting generation.
 
   messages.push({ role: 'user', content: request.userMessage });
 
+  // Use prefill technique to force Claude to start with <image-plan> tags
+  // This ensures the JSON is always output first
+  messages.push({ role: 'assistant', content: '<image-plan>\n[' });
+
   try {
     const response = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -734,7 +764,12 @@ If approving generation, your message should confirm you're starting generation.
       throw new ClaudeError('No text in response', 'INVALID_RESPONSE');
     }
 
-    const fullResponse = textContent.text;
+    // Prepend the prefilled content to get the full response
+    const fullResponse = '<image-plan>\n[' + textContent.text;
+    console.log('[ImagePlanning] Continue response (with prefill):');
+    console.log('─'.repeat(60));
+    console.log(fullResponse);
+    console.log('─'.repeat(60));
 
     // Parse the image plan
     const planMatch = fullResponse.match(/<image-plan>([\s\S]*?)<\/image-plan>/);
@@ -745,9 +780,14 @@ If approving generation, your message should confirm you're starting generation.
       try {
         recommendations = JSON.parse(planMatch[1].trim());
         message = fullResponse.replace(/<image-plan>[\s\S]*?<\/image-plan>/g, '').trim();
+        console.log(`[ImagePlanning] Parsed ${recommendations.length} recommendations from response`);
       } catch (parseError) {
-        console.error('Failed to parse image plan JSON:', parseError);
+        console.error('[ImagePlanning] Failed to parse image plan JSON:', parseError);
+        console.error('[ImagePlanning] Raw JSON:', planMatch[1]);
       }
+    } else {
+      console.warn('[ImagePlanning] WARNING: No <image-plan> tags found in response!');
+      console.warn('[ImagePlanning] Falling back to original plan with', recommendations.length, 'images');
     }
 
     return {

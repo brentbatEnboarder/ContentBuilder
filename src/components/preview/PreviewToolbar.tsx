@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Copy, Download, RotateCw, Loader2, FileText, Sparkles } from 'lucide-react';
+import { Smartphone, Download, RotateCw, Loader2, FileText, Sparkles, FlaskConical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -27,6 +27,8 @@ interface PreviewToolbarProps {
   isGenerating: boolean;
   onNavigateToVoice: () => void;
   onRegenerate: () => void;
+  onMockup?: () => void;
+  onTestCapture?: () => void;
   contentBlocks?: ContentBlock[];
   pageTitle?: string;
   images?: string[];
@@ -38,6 +40,8 @@ export const PreviewToolbar = ({
   isGenerating,
   onNavigateToVoice,
   onRegenerate,
+  onMockup,
+  onTestCapture,
   contentBlocks = [],
   pageTitle = 'Untitled',
   images = [],
@@ -62,9 +66,10 @@ export const PreviewToolbar = ({
   // Check if there are any images
   const hasImages = contentBlocks.some((b) => b.type === 'image') || images.length > 0;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(content);
-    toast.success('Copied to clipboard!');
+  const handleMockup = () => {
+    if (onMockup) {
+      onMockup();
+    }
   };
 
   const handleExportMarkdown = () => {
@@ -186,21 +191,39 @@ export const PreviewToolbar = ({
         </Tooltip>
       </div>
 
-      {/* Right section: Export Actions */}
+      {/* Right section: Mockup & Export Actions */}
       <div className="flex items-center gap-1">
+        {/* Test Capture Button (for debugging) */}
+        {onTestCapture && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                onClick={onTestCapture}
+                disabled={!hasContent}
+              >
+                <FlaskConical className="w-4 h-4 text-amber-600" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Test capture (download preview)</TooltipContent>
+          </Tooltip>
+        )}
+
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-              onClick={handleCopy}
+              className="h-9 w-9 rounded-lg hover:bg-primary/10 dark:hover:bg-primary/20"
+              onClick={handleMockup}
               disabled={!hasContent}
             >
-              <Copy className="w-4 h-4 text-muted-foreground" />
+              <Smartphone className="w-4 h-4 text-primary" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Copy to clipboard</TooltipContent>
+          <TooltipContent>Create device mockup</TooltipContent>
         </Tooltip>
 
         <DropdownMenu>

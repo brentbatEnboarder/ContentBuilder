@@ -18,6 +18,7 @@ import {
   generateImagesStreaming,
   regenerateSingleImage,
   editImageWithReference,
+  generateMockup,
   ImageGenError,
   GenerateImagesRequest,
   buildImagePrompt,
@@ -1108,6 +1109,85 @@ router.post('/images/edit', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Failed to edit image',
+    });
+  }
+});
+
+/**
+ * POST /api/generate/mockup
+ * Generate device mockups by compositing content onto phone templates
+ * Uses Gemini to create realistic mockups with proper lighting and reflections
+ *
+ * Request body:
+ * {
+ *   mockupTemplateBase64: string,  // The phone mockup template image
+ *   contentScreenshotBase64: string,  // The content to display on the phone screen
+ *   templateName: string  // Name of the template for logging
+ * }
+ */
+router.post('/mockup', async (req: Request, res: Response) => {
+  try {
+    const { mockupTemplateBase64, contentScreenshotBase64, templateName } = req.body;
+
+    if (!mockupTemplateBase64 || typeof mockupTemplateBase64 !== 'string') {
+      res.status(400).json({
+        success: false,
+        error: 'Missing or invalid mockupTemplateBase64',
+      });
+      return;
+    }
+
+    if (!contentScreenshotBase64 || typeof contentScreenshotBase64 !== 'string') {
+      res.status(400).json({
+        success: false,
+        error: 'Missing or invalid contentScreenshotBase64',
+      });
+      return;
+    }
+
+    // Use the service function to generate mockups
+    const images = await generateMockup(
+      mockupTemplateBase64,
+      contentScreenshotBase64,
+      templateName || 'Unknown'
+    );
+
+    res.json({
+      success: true,
+      data: {
+        images: images.map((img) => ({
+          id: img.id,
+          base64Data: img.base64Data,
+          mimeType: img.mimeType,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error('Generate mockup error:', error);
+
+    if (error instanceof ImageGenError) {
+      const statusCode =
+        error.code === 'RATE_LIMIT'
+          ? 429
+          : error.code === 'AUTH_ERROR'
+            ? 401
+            : error.code === 'CONFIG_ERROR'
+              ? 503
+              : error.code === 'CONTENT_FILTERED'
+                ? 422
+                : 500;
+
+      res.status(statusCode).json({
+        success: false,
+        error: error.message,
+        code: error.code,
+      });
+      return;
+    }
+
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate mockup',
     });
   }
 });

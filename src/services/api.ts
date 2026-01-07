@@ -241,6 +241,32 @@ export interface ExtractedCompanyInfo {
 // API Client
 // ============================================================================
 
+// ============================================================================
+// Mockup Generation Types
+// ============================================================================
+
+export interface MockupGenerationRequest {
+  mockupTemplateBase64: string;
+  contentScreenshotBase64: string;
+  templateName: string;
+}
+
+export interface MockupGenerationResponse {
+  success: boolean;
+  data?: {
+    images: Array<{
+      id: string;
+      base64Data: string;
+      mimeType: string;
+    }>;
+  };
+  error?: string;
+}
+
+// ============================================================================
+// API Client
+// ============================================================================
+
 export const apiClient = {
   health: async (): Promise<HealthResponse> => {
     const { data } = await api.get<HealthResponse>('/health');
@@ -670,6 +696,17 @@ export const apiClient = {
     }
 
     return result;
+  },
+
+  /**
+   * Generate device mockups by compositing content onto phone templates
+   * Uses Gemini to create realistic mockups with proper lighting and reflections
+   */
+  generateMockup: async (params: MockupGenerationRequest): Promise<MockupGenerationResponse> => {
+    const { data } = await api.post<MockupGenerationResponse>('/generate/mockup', params, {
+      timeout: 180000, // 3 minutes - generating 3 variations
+    });
+    return data;
   },
 };
 

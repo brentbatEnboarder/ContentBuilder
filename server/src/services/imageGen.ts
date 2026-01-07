@@ -168,7 +168,7 @@ async function generateSingleVariation(
       responseModalities: ['TEXT', 'IMAGE'],
       imageConfig: {
         aspectRatio: aspectRatio,
-        imageSize: '1K',
+        imageSize: '2K',
       },
     },
   });
@@ -529,7 +529,7 @@ Important guidelines:
         responseModalities: ['TEXT', 'IMAGE'],
         imageConfig: {
           aspectRatio: aspectRatio,
-          imageSize: '1K',
+          imageSize: '2K',
         },
       },
     });
@@ -569,6 +569,115 @@ Important guidelines:
       `Failed to edit image: ${errorMessage}`,
       'EDIT_FAILED'
     );
+  }
+}
+
+/**
+ * Generate a device mockup by compositing content onto a phone template
+ * Uses Gemini to create a realistic mockup with proper lighting and reflections
+ */
+export async function generateMockup(
+  mockupTemplateBase64: string,
+  contentScreenshotBase64: string,
+  templateName: string = 'Unknown'
+): Promise<GeneratedImage[]> {
+  const client = getGenAIClient();
+
+  console.log(`[Mockup] Generating mockup using template: ${templateName}`);
+  const startTime = Date.now();
+
+  // Detailed prompt emphasizing realistic screen reflections
+  const prompt = `You are a world-class photo retoucher creating an ultra-realistic device mockup that looks like an actual photograph, not a digital composite.
+
+I'm providing you with two images:
+1. IMAGE 1 (Template): A photograph of a smartphone being held or displayed in a real environment
+2. IMAGE 2 (Content): A mobile app screenshot that should appear on the phone's screen
+
+Your task: Seamlessly composite the content onto the phone screen so it looks like the phone was actually photographed displaying this content.
+
+CRITICAL REQUIREMENTS FOR REALISM:
+
+SCREEN REFLECTIONS (Most Important):
+- Add subtle screen reflections that match the environment in the template photo
+- If there are light sources visible (windows, lamps, ambient light), show soft reflections of these on the screen
+- The reflections should be semi-transparent, allowing the content to show through
+- Glass screens naturally reflect the environment - this is what makes mockups look real vs photoshopped
+- Match the reflection intensity to the ambient lighting (brighter environments = more visible reflections)
+
+PERSPECTIVE & FIT:
+- Content must perfectly match the phone screen's perspective and angle
+- Warp/transform the content to fit the exact screen boundaries
+- Account for any tilt or rotation of the phone
+
+LIGHTING & INTEGRATION:
+- The screen should appear as an illuminated display with realistic brightness
+- Match the color temperature of the screen to the environment's lighting
+- Add subtle edge lighting where the screen meets the bezel
+- The overall image should look like a single photograph, not two images combined
+
+PRESERVE THE ORIGINAL:
+- Keep the original background, hands, environment exactly as they are
+- Only modify the phone's screen area
+
+Generate exactly ONE high-quality mockup image.`;
+
+  try {
+    console.log(`[Mockup] Starting generation request...`);
+    const response = await client.models.generateContent({
+      model: IMAGE_MODEL,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: 'image/png',
+                data: mockupTemplateBase64,
+              },
+            },
+            {
+              inlineData: {
+                mimeType: 'image/png',
+                data: contentScreenshotBase64,
+              },
+            },
+          ],
+        },
+      ],
+      config: {
+        responseModalities: ['IMAGE'],
+        imageConfig: {
+          aspectRatio: '16:9', // Landscape for mockup images
+          imageSize: '2K',
+        },
+      },
+    });
+
+    // Extract image from response
+    const candidate = response.candidates?.[0];
+    if (!candidate?.content?.parts) {
+      throw new Error('No content in response');
+    }
+
+    for (const part of candidate.content.parts) {
+      if (part.inlineData) {
+        const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log(`[Mockup] Generation completed in ${duration}s`);
+        return [{
+          id: generateImageId(),
+          base64Data: part.inlineData.data as string,
+          mimeType: part.inlineData.mimeType || 'image/png',
+          prompt,
+        }];
+      }
+    }
+
+    throw new Error('No image data in response');
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[Mockup] Generation failed:`, errorMessage);
+    throw new ImageGenError(`Mockup generation failed: ${errorMessage}`, 'GENERATION_FAILED');
   }
 }
 

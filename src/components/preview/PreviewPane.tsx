@@ -1,3 +1,4 @@
+import { Pencil, Trash2 } from 'lucide-react';
 import { PreviewToolbar } from './PreviewToolbar';
 import { ContentPreview } from './ContentPreview';
 import { ContentSkeleton } from './ContentSkeleton';
@@ -6,14 +7,43 @@ import { ImageCard } from './ImageCard';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { ContentBlock } from '@/types/content';
 
-// Component to display a single image from content blocks
-const BlockImage = ({ block }: { block: ContentBlock & { type: 'image' } }) => (
-  <div className="rounded-lg overflow-hidden shadow-md">
+// Component to display a single image from content blocks with hover actions
+interface BlockImageProps {
+  block: ContentBlock & { type: 'image' };
+  onEdit?: (block: ContentBlock & { type: 'image' }) => void;
+  onDelete?: (blockId: string) => void;
+}
+
+const BlockImage = ({ block, onEdit, onDelete }: BlockImageProps) => (
+  <div className="relative group rounded-lg overflow-hidden shadow-md">
     <img
       src={block.imageUrl}
       alt={block.altText || 'Generated image'}
       className="w-full h-auto object-contain"
     />
+    {/* Hover overlay with actions */}
+    {(onEdit || onDelete) && (
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100">
+        {onEdit && (
+          <button
+            onClick={() => onEdit(block)}
+            className="p-3 rounded-full bg-white/90 hover:bg-white text-slate-700 hover:text-primary transition-colors shadow-lg"
+            title="Edit image"
+          >
+            <Pencil className="w-5 h-5" />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            onClick={() => onDelete(block.id)}
+            className="p-3 rounded-full bg-white/90 hover:bg-white text-slate-700 hover:text-red-500 transition-colors shadow-lg"
+            title="Delete image"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
+        )}
+      </div>
+    )}
   </div>
 );
 
@@ -37,6 +67,8 @@ interface PreviewPaneProps {
   onRegenerate: () => void;
   onRegenerateImage?: (index: number) => void;
   onTextChange?: (text: string) => void;
+  onMockup?: () => void;
+  onTestCapture?: () => void;
   // Legacy props for planned images
   plannedImages?: GeneratedImageSet[];
   isGeneratingImages?: boolean;
@@ -45,6 +77,9 @@ interface PreviewPaneProps {
   onReorderBlocks?: (fromIndex: number, toIndex: number) => void;
   onDeleteBlock?: (blockId: string) => void;
   onUpdateBlock?: (blockId: string, updates: Partial<ContentBlock>) => void;
+  // Image block actions
+  onEditImageBlock?: (block: ContentBlock & { type: 'image' }) => void;
+  onDeleteImageBlock?: (blockId: string) => void;
   // Page title for downloads
   pageTitle?: string;
 }
@@ -56,9 +91,13 @@ export const PreviewPane = ({
   onRegenerate,
   onRegenerateImage,
   onTextChange,
+  onMockup,
+  onTestCapture,
   plannedImages = [],
   isGeneratingImages = false,
   contentBlocks = [],
+  onEditImageBlock,
+  onDeleteImageBlock,
   pageTitle = 'Untitled',
 }: PreviewPaneProps) => {
   const hasContent = content.text.length > 0;
@@ -87,6 +126,8 @@ export const PreviewPane = ({
         isGenerating={isGenerating}
         onNavigateToVoice={onNavigateToVoice}
         onRegenerate={onRegenerate}
+        onMockup={onMockup}
+        onTestCapture={onTestCapture}
         contentBlocks={contentBlocks}
         pageTitle={pageTitle}
         images={content.images}
@@ -96,7 +137,12 @@ export const PreviewPane = ({
         <div className="p-6 space-y-6">
           {/* Header Images from content blocks (new flow) */}
           {headerImageBlocks.map((block) => (
-            <BlockImage key={block.id} block={block} />
+            <BlockImage
+              key={block.id}
+              block={block}
+              onEdit={onEditImageBlock}
+              onDelete={onDeleteImageBlock}
+            />
           ))}
 
           {/* Header Images from planned images (legacy flow) */}
@@ -129,7 +175,12 @@ export const PreviewPane = ({
 
           {/* Body Images from content blocks (new flow) */}
           {bodyImageBlocks.map((block) => (
-            <BlockImage key={block.id} block={block} />
+            <BlockImage
+              key={block.id}
+              block={block}
+              onEdit={onEditImageBlock}
+              onDelete={onDeleteImageBlock}
+            />
           ))}
 
           {/* Body Images from planned images (legacy flow) */}

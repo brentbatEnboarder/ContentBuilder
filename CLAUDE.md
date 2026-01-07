@@ -204,6 +204,8 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 110. **Mockup Text Weight Fix** - Mobile render uses font-weight 300 for body text with antialiased smoothing, preventing heavy/bold appearance in device mockups.
 111. **2K Image Resolution** - All Gemini image generation upgraded from 1K to 2K (~2048px) for sharper images.
 112. **Image Planning Conversation Fix** - Prefill technique forces Claude to output `<image-plan>` JSON tags. React state timing fix ensures fresh recommendations are used when generating (not stale state).
+113. **Mockup Download Fix** - Fixed download buttons by converting base64 data URLs directly to Blob instead of using fetch() which fails for large images. Added toast notifications for success/error feedback.
+114. **Word Export Aspect Ratio Fix** - Fixed vertical image distortion by reading actual image dimensions instead of relying on stored aspect ratio. Now preserves original aspect ratio for all images.
 
 ## Environment Variables
 

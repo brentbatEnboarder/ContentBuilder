@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import type { MockupResult } from '@/types/mockup';
 
 interface MockupResultsModalProps {
@@ -66,12 +67,27 @@ export const MockupResultsModal = ({
     [lightboxIndex, results.length]
   );
 
+  // Convert base64 data URL directly to Blob (more reliable than fetch for large images)
+  const dataUrlToBlob = (dataUrl: string): Blob => {
+    const [header, base64Data] = dataUrl.split(',');
+    const mimeMatch = header.match(/data:([^;]+)/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+
+    const byteCharacters = atob(base64Data);
+    const byteNumbers = new Uint8Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    return new Blob([byteNumbers], { type: mimeType });
+  };
+
   // Download helper - converts data URL to blob and triggers download
   const downloadImage = async (dataUrl: string, filename: string, format: 'png' | 'jpeg') => {
     try {
-      // If format is jpeg and source is png, we need to convert
+      let blob: Blob;
+
       if (format === 'jpeg') {
-        // Create canvas to convert
+        // Convert to JPEG using canvas
         const img = new Image();
         await new Promise<void>((resolve, reject) => {
           img.onload = () => resolve();
@@ -88,13 +104,15 @@ export const MockupResultsModal = ({
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0);
-          dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+          const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+          blob = dataUrlToBlob(jpegDataUrl);
+        } else {
+          throw new Error('Could not get canvas context');
         }
+      } else {
+        // PNG - convert directly without canvas
+        blob = dataUrlToBlob(dataUrl);
       }
-
-      // Convert data URL to blob
-      const response = await fetch(dataUrl);
-      const blob = await response.blob();
 
       // Create download link
       const url = URL.createObjectURL(blob);
@@ -128,8 +146,10 @@ export const MockupResultsModal = ({
           await new Promise((resolve) => setTimeout(resolve, 300));
         }
       }
+      toast.success(`Downloaded ${toDownload.length} mockup${toDownload.length > 1 ? 's' : ''} as ${format.toUpperCase()}`);
     } catch (error) {
       console.error('Download error:', error);
+      toast.error('Failed to download mockup. Please try again.');
     } finally {
       setIsDownloading(false);
     }

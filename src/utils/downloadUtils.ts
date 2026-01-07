@@ -200,6 +200,22 @@ function base64ToUint8Array(dataUrl: string): Uint8Array {
 }
 
 /**
+ * Get actual image dimensions from a data URL by loading it
+ */
+async function getActualImageDimensions(dataUrl: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.onerror = () => {
+      reject(new Error('Failed to load image for dimension detection'));
+    };
+    img.src = dataUrl;
+  });
+}
+
+/**
  * Parse inline markdown formatting (bold, italic) into TextRuns
  */
 function parseInlineFormatting(text: string): TextRun[] {
@@ -334,51 +350,42 @@ function parseMarkdownToParagraphs(markdown: string): Paragraph[] {
 }
 
 /**
- * Get image dimensions based on aspect ratio
- * Returns width and height in EMUs (English Metric Units) - Word's internal unit
- * 1 inch = 914400 EMUs
- * Max width ~6 inches for letter paper with margins
- * Max height ~8 inches to leave room for page content
+ * Calculate Word document dimensions from actual image pixel dimensions
+ * Returns width and height in pixels for docx ImageRun transformation
+ * Max width ~6 inches (576px at 96 DPI) for letter paper with margins
+ * Max height ~8 inches (768px at 96 DPI) to leave room for page content
  */
-function getImageDimensions(aspectRatio: string): { width: number; height: number } {
-  const emuPerInch = 914400;
-  const maxWidthInches = 6;
-  const maxHeightInches = 8;
-  const maxWidthEMU = maxWidthInches * emuPerInch;
-  const maxHeightEMU = maxHeightInches * emuPerInch;
+function calculateWordImageDimensions(
+  actualWidth: number,
+  actualHeight: number
+): { width: number; height: number } {
+  const maxWidthPx = 576; // 6 inches at 96 DPI
+  const maxHeightPx = 768; // 8 inches at 96 DPI
 
-  const ratioMap: Record<string, number> = {
-    '21:9': 21 / 9,
-    '16:9': 16 / 9,
-    '4:3': 4 / 3,
-    '3:2': 3 / 2,
-    '1:1': 1,
-    '9:16': 9 / 16,
-  };
-
-  const ratio = ratioMap[aspectRatio] || 16 / 9;
+  // Calculate actual aspect ratio from image dimensions
+  const ratio = actualWidth / actualHeight;
 
   let width: number;
   let height: number;
 
   if (ratio >= 1) {
     // Landscape or square: constrain by width
-    width = maxWidthEMU;
+    width = Math.min(actualWidth, maxWidthPx);
     height = Math.round(width / ratio);
 
     // If height exceeds max, scale down
-    if (height > maxHeightEMU) {
-      height = maxHeightEMU;
+    if (height > maxHeightPx) {
+      height = maxHeightPx;
       width = Math.round(height * ratio);
     }
   } else {
     // Portrait: constrain by height first to prevent distortion
-    height = maxHeightEMU;
+    height = Math.min(actualHeight, maxHeightPx);
     width = Math.round(height * ratio);
 
     // If width exceeds max, scale down
-    if (width > maxWidthEMU) {
-      width = maxWidthEMU;
+    if (width > maxWidthPx) {
+      width = maxWidthPx;
       height = Math.round(width / ratio);
     }
   }
@@ -416,9 +423,12 @@ export async function downloadAsWord(
       children.push(...textParagraphs);
     } else if (block.type === 'image') {
       try {
+        // Get actual image dimensions to preserve aspect ratio
+        const actualDims = await getActualImageDimensions(block.imageUrl);
+        const dimensions = calculateWordImageDimensions(actualDims.width, actualDims.height);
+
         // Convert image to Uint8Array
         const imageData = base64ToUint8Array(block.imageUrl);
-        const dimensions = getImageDimensions(block.aspectRatio);
 
         // Add image paragraph
         children.push(
@@ -427,8 +437,8 @@ export async function downloadAsWord(
               new ImageRun({
                 data: imageData,
                 transformation: {
-                  width: dimensions.width / 9525, // Convert EMU to points
-                  height: dimensions.height / 9525,
+                  width: dimensions.width,
+                  height: dimensions.height,
                 },
                 type: 'png',
               }),

@@ -68,7 +68,6 @@ interface PreviewPaneProps {
   onRegenerateImage?: (index: number) => void;
   onTextChange?: (text: string) => void;
   onMockup?: () => void;
-  onTestCapture?: () => void;
   // Legacy props for planned images
   plannedImages?: GeneratedImageSet[];
   isGeneratingImages?: boolean;
@@ -92,7 +91,6 @@ export const PreviewPane = ({
   onRegenerateImage,
   onTextChange,
   onMockup,
-  onTestCapture,
   plannedImages = [],
   isGeneratingImages = false,
   contentBlocks = [],
@@ -127,7 +125,6 @@ export const PreviewPane = ({
         onNavigateToVoice={onNavigateToVoice}
         onRegenerate={onRegenerate}
         onMockup={onMockup}
-        onTestCapture={onTestCapture}
         contentBlocks={contentBlocks}
         pageTitle={pageTitle}
         images={content.images}

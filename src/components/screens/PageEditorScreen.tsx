@@ -547,14 +547,6 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
     });
   }, [mockupGenerator, generatedContent.text, generatedContent.contentBlocks]);
 
-  // Handle test capture (downloads the mobile-sized screenshot for debugging)
-  const handleTestCapture = useCallback(() => {
-    mockupGenerator.testCapture({
-      text: generatedContent.text,
-      contentBlocks: generatedContent.contentBlocks,
-    });
-  }, [mockupGenerator, generatedContent.text, generatedContent.contentBlocks]);
-
   if (!page) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -596,7 +588,6 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
             onRegenerate={handleRegenerateText}
             onTextChange={handleTextChange}
             onMockup={handleOpenMockup}
-            onTestCapture={handleTestCapture}
             isGeneratingImages={isGeneratingImages}
             onEditImageBlock={handleEditImageBlock}
             onDeleteImageBlock={handleDeleteImageBlock}

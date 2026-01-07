@@ -691,7 +691,6 @@ Generate professional device mockups by compositing content onto phone templates
 - Renders at 390px logical width with 3x scale for retina quality
 - Creates hidden DOM element, renders header image + formatted text, captures with html2canvas
 - Text reflows naturally for mobile width (not scaled-down desktop)
-- **Test button** (Flask icon, amber) downloads captured screenshot for debugging
 
 **Mockup Prompt (emphasizes realistic reflections):**
 The Gemini prompt specifically instructs:
@@ -707,7 +706,7 @@ The Gemini prompt specifically instructs:
 
 **Key Files:**
 - `src/types/mockup.ts` - Types for templates, results, API
-- `src/hooks/useMockupGenerator.ts` - State machine with `captureContent()`, `testCapture()`, `generateMockup()`, `openEdit()`, `submitEdit()`, `deleteMockup()`
+- `src/hooks/useMockupGenerator.ts` - State machine with `captureContent()`, `generateMockup()`, `openEdit()`, `submitEdit()`, `deleteMockup()`
 - `src/components/modals/MockupSelectionModal.tsx` - Template picker grid
 - `src/components/modals/MockupResultsModal.tsx` - Results with hover actions, lightbox, download buttons
 - `server/src/services/imageGen.ts` - `generateMockup()` function

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Smartphone, Download, RotateCw, Loader2, FileText, Sparkles, FlaskConical } from 'lucide-react';
+import { Smartphone, Download, RotateCw, Loader2, FileText, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -28,7 +28,6 @@ interface PreviewToolbarProps {
   onNavigateToVoice: () => void;
   onRegenerate: () => void;
   onMockup?: () => void;
-  onTestCapture?: () => void;
   contentBlocks?: ContentBlock[];
   pageTitle?: string;
   images?: string[];
@@ -41,7 +40,6 @@ export const PreviewToolbar = ({
   onNavigateToVoice,
   onRegenerate,
   onMockup,
-  onTestCapture,
   contentBlocks = [],
   pageTitle = 'Untitled',
   images = [],
@@ -192,35 +190,17 @@ export const PreviewToolbar = ({
       </div>
 
       {/* Right section: Mockup & Export Actions */}
-      <div className="flex items-center gap-1">
-        {/* Test Capture Button (for debugging) */}
-        {onTestCapture && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30"
-                onClick={onTestCapture}
-                disabled={!hasContent}
-              >
-                <FlaskConical className="w-4 h-4 text-amber-600" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Test capture (download preview)</TooltipContent>
-          </Tooltip>
-        )}
-
+      <div className="flex items-center gap-2">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 rounded-lg hover:bg-primary/10 dark:hover:bg-primary/20"
+              className="h-10 w-10 rounded-lg hover:bg-primary/10 dark:hover:bg-primary/20"
               onClick={handleMockup}
               disabled={!hasContent}
             >
-              <Smartphone className="w-4 h-4 text-primary" />
+              <Smartphone className="w-5 h-5 text-primary" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Create device mockup</TooltipContent>
@@ -233,10 +213,10 @@ export const PreviewToolbar = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className="h-10 w-10 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                   disabled={!hasContent}
                 >
-                  <Download className="w-4 h-4 text-muted-foreground" />
+                  <Download className="w-5 h-5 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>

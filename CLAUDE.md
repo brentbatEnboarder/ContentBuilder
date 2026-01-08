@@ -206,6 +206,7 @@ All tables have RLS enabled with policies scoped to `auth.uid() = created_by`.
 112. **Image Planning Conversation Fix** - Prefill technique forces Claude to output `<image-plan>` JSON tags. React state timing fix ensures fresh recommendations are used when generating (not stale state).
 113. **Mockup Download Fix** - Fixed download buttons by converting base64 data URLs directly to Blob instead of using fetch() which fails for large images. Added toast notifications for success/error feedback.
 114. **Word Export Aspect Ratio Fix** - Fixed vertical image distortion by reading actual image dimensions instead of relying on stored aspect ratio. Now preserves original aspect ratio for all images.
+115. **Tab Switch State Persistence** - Navigation state and unsaved page editor content now persist across browser tab switches via sessionStorage. Draft auto-saves on content change and visibility change. Drafts expire after 1 hour and clear on successful save.
 
 ## Environment Variables
 

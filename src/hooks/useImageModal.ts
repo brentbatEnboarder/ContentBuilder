@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { apiClient } from '../services/api';
 import type {
   ImagePlacement,
@@ -8,6 +8,59 @@ import type {
   ImageModalState,
 } from '../types/imageGeneration';
 import type { ContentBlock, AspectRatio } from '../types/content';
+
+// ============================================================================
+// Draft persistence for tab switching
+// ============================================================================
+
+const DRAFT_KEY = 'contentbuilder_image_modal_draft';
+const DRAFT_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes (image generation sessions are shorter)
+
+interface ImageModalDraft {
+  modalState: ImageModalState;
+  placements: ImagePlacement[];
+  selectedImages: Record<string, string>;
+  skippedPlacements: string[];
+  currentStyleId: string;
+  progress: GenerationProgress;
+  savedAt: number;
+}
+
+function loadImageModalDraft(): ImageModalDraft | null {
+  try {
+    const saved = sessionStorage.getItem(DRAFT_KEY);
+    if (!saved) return null;
+    const draft = JSON.parse(saved) as ImageModalDraft;
+    // Check expiry
+    if (Date.now() - draft.savedAt > DRAFT_EXPIRY_MS) {
+      sessionStorage.removeItem(DRAFT_KEY);
+      return null;
+    }
+    // Only restore if modal was actively in use
+    if (draft.modalState === 'closed' || draft.placements.length === 0) {
+      return null;
+    }
+    return draft;
+  } catch {
+    return null;
+  }
+}
+
+function saveImageModalDraft(draft: ImageModalDraft): void {
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+function clearImageModalDraft(): void {
+  try {
+    sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // Ignore errors
+  }
+}
 
 interface UseImageModalOptions {
   onImagesApplied?: (blocks: ContentBlock[]) => void;
@@ -82,6 +135,79 @@ export function useImageModal(options: UseImageModalOptions = {}) {
     placementId: string;
     anchorRect: DOMRect | null;
   } | null>(null);
+
+  // Track if we've restored from draft to prevent loops
+  const hasRestoredRef = useRef(false);
+
+  // Restore state from draft on mount (handles tab switching)
+  useEffect(() => {
+    if (hasRestoredRef.current) return;
+
+    const draft = loadImageModalDraft();
+    if (draft) {
+      console.log('[useImageModal] Restoring draft from tab switch', {
+        modalState: draft.modalState,
+        placementCount: draft.placements.length,
+        savedAt: new Date(draft.savedAt).toISOString(),
+      });
+
+      hasRestoredRef.current = true;
+      setModalState(draft.modalState);
+      setPlacements(draft.placements);
+      setSelectedImages(draft.selectedImages);
+      setSkippedPlacements(new Set(draft.skippedPlacements));
+      setCurrentStyleId(draft.currentStyleId);
+      setProgress(draft.progress);
+    }
+  }, []);
+
+  // Auto-save draft when state changes (for tab switch protection)
+  useEffect(() => {
+    // Only save if modal is open and we have placements
+    if (modalState === 'closed' || placements.length === 0) return;
+
+    const draft: ImageModalDraft = {
+      modalState,
+      placements,
+      selectedImages,
+      skippedPlacements: Array.from(skippedPlacements),
+      currentStyleId,
+      progress,
+      savedAt: Date.now(),
+    };
+
+    saveImageModalDraft(draft);
+    console.log('[useImageModal] Draft saved', {
+      modalState,
+      placementCount: placements.length,
+    });
+  }, [modalState, placements, selectedImages, skippedPlacements, currentStyleId, progress]);
+
+  // Save draft immediately when tab is hidden (visibility change)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && modalState !== 'closed' && placements.length > 0) {
+        const draft: ImageModalDraft = {
+          modalState,
+          placements,
+          selectedImages,
+          skippedPlacements: Array.from(skippedPlacements),
+          currentStyleId,
+          progress,
+          savedAt: Date.now(),
+        };
+
+        saveImageModalDraft(draft);
+        console.log('[useImageModal] Draft saved on tab hide', {
+          modalState,
+          placementCount: placements.length,
+        });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [modalState, placements, selectedImages, skippedPlacements, currentStyleId, progress]);
 
   // Flatten images for lightbox navigation
   const lightboxImages = useMemo<LightboxImage[]>(() => {
@@ -510,6 +636,9 @@ export function useImageModal(options: UseImageModalOptions = {}) {
       message: 'Starting...',
       percent: 0,
     });
+    // Clear the draft when modal is explicitly closed
+    clearImageModalDraft();
+    console.log('[useImageModal] Modal closed, draft cleared');
   }, []);
 
   // Check if we can apply (at least one non-skipped placement with a selection)

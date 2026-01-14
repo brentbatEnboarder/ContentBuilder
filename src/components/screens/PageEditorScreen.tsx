@@ -20,6 +20,8 @@ import { useStyleSettings } from '@/hooks/useStyleSettings';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useMockupGenerator } from '@/hooks/useMockupGenerator';
 import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useNavigationGuard, useRegisterNavigationGuard } from '@/contexts/NavigationGuardContext';
+import { Button } from '@/components/ui/button';
 import {
   ImageGenerationModal,
   ImageSelectionGrid,
@@ -210,6 +212,20 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
       setIsSaving(false);
     }
   }, [save]);
+
+  // Save callback for navigation guard (saves without showing toast for cleaner UX)
+  const saveForNavigation = useCallback(async () => {
+    setIsSaving(true);
+    try {
+      await save();
+    } finally {
+      setIsSaving(false);
+    }
+  }, [save]);
+
+  // Register navigation guard to handle "New Page" with unsaved changes
+  const { pendingAction, confirmSave, confirmDiscard, cancelNavigation } = useNavigationGuard();
+  useRegisterNavigationGuard(isDirty, saveForNavigation);
 
   // Register header actions
   useRegisterHeaderActions(
@@ -710,7 +726,7 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
         onClose={mockupGenerator.closeEdit}
       />
 
-      {/* Discard Changes Dialog */}
+      {/* Discard Changes Dialog (for back button) */}
       <AlertDialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -724,6 +740,36 @@ export const PageEditorScreen = ({ pageId, onBack, onNavigate }: PageEditorScree
             <AlertDialogAction onClick={handleDiscard}>
               Discard
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unsaved Changes Dialog (for New Page navigation) */}
+      <AlertDialog open={pendingAction === 'new-page'} onOpenChange={(open) => !open && cancelNavigation()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes on this page. What would you like to do?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel onClick={cancelNavigation}>Cancel</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              onClick={confirmDiscard}
+            >
+              Discard
+            </Button>
+            <Button
+              onClick={async () => {
+                await confirmSave();
+                toast.success('Page saved successfully');
+              }}
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving...' : 'Save'}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

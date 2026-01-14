@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { NavItem } from './NavItem';
 import { UserMenu } from './UserMenu';
 import { useOnboarding, OnboardingStep } from '@/contexts/OnboardingContext';
+import { useNavigationGuard } from '@/contexts/NavigationGuardContext';
 import type { ScreenType } from '@/hooks/useNavigation';
 import {
   Tooltip,
@@ -36,7 +37,6 @@ interface LeftNavProps {
   activeScreen: ScreenType;
   onToggle: () => void;
   onNavigate: (screen: ScreenType) => void;
-  onCreateNewPage: () => void;
 }
 
 const setupItems: { icon: typeof FilePlus; label: string; screen: ScreenType }[] = [
@@ -56,9 +56,9 @@ export const LeftNav = ({
   activeScreen,
   onToggle,
   onNavigate,
-  onCreateNewPage,
 }: LeftNavProps) => {
   const { isOnboarding, isStepCompleted, canNavigateToStep } = useOnboarding();
+  const { requestNewPage } = useNavigationGuard();
 
   const toggleButton = (
     <button
@@ -200,7 +200,7 @@ export const LeftNav = ({
                     isActive={activeScreen === 'new-page'}
                     isCollapsed={isCollapsed}
                     isPrimary={newPageItem.isPrimary}
-                    onClick={() => canNavigate && onCreateNewPage()}
+                    onClick={() => canNavigate && requestNewPage()}
                   />
                 </div>
               );

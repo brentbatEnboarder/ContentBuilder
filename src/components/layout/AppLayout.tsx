@@ -5,6 +5,7 @@ import { TopHeader } from './TopHeader';
 import { WizardBanner } from '@/components/onboarding/WizardBanner';
 import { useNavigation, ScreenType } from '@/hooks/useNavigation';
 import { useOnboarding, OnboardingStep } from '@/contexts/OnboardingContext';
+import { NavigationGuardProvider } from '@/contexts/NavigationGuardContext';
 import { CompanyInfoScreen } from '@/components/screens/CompanyInfoScreen';
 import { BrandVoiceScreen } from '@/components/screens/BrandVoiceScreen';
 import { ImageStyleScreen } from '@/components/screens/ImageStyleScreen';
@@ -118,6 +119,28 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Page editor uses full height without nav layout wrapper
   if (activeScreen === 'page-editor' || activeScreen === 'new-page') {
     return (
+      <NavigationGuardProvider onCreateNewPage={createNewPage}>
+        <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
+          <TopHeader activeScreen={activeScreen} />
+          <WizardBanner />
+          <div className="flex flex-1 overflow-hidden">
+            <LeftNav
+              isCollapsed={isNavCollapsed}
+              activeScreen={activeScreen}
+              onToggle={toggleNav}
+              onNavigate={setActiveScreen}
+            />
+            <main className="flex-1 overflow-hidden">
+              {children || renderScreen()}
+            </main>
+          </div>
+        </div>
+      </NavigationGuardProvider>
+    );
+  }
+
+  return (
+    <NavigationGuardProvider onCreateNewPage={createNewPage}>
       <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
         <TopHeader activeScreen={activeScreen} />
         <WizardBanner />
@@ -127,32 +150,12 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             activeScreen={activeScreen}
             onToggle={toggleNav}
             onNavigate={setActiveScreen}
-            onCreateNewPage={createNewPage}
           />
-          <main className="flex-1 overflow-hidden">
+          <main className="flex-1 overflow-auto">
             {children || renderScreen()}
           </main>
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
-      <TopHeader activeScreen={activeScreen} />
-      <WizardBanner />
-      <div className="flex flex-1 overflow-hidden">
-        <LeftNav
-          isCollapsed={isNavCollapsed}
-          activeScreen={activeScreen}
-          onToggle={toggleNav}
-          onNavigate={setActiveScreen}
-          onCreateNewPage={createNewPage}
-        />
-        <main className="flex-1 overflow-auto">
-          {children || renderScreen()}
-        </main>
-      </div>
-    </div>
+    </NavigationGuardProvider>
   );
 };

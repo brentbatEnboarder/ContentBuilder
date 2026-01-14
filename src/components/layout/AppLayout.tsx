@@ -127,6 +127,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             activeScreen={activeScreen}
             onToggle={toggleNav}
             onNavigate={setActiveScreen}
+            onCreateNewPage={createNewPage}
           />
           <main className="flex-1 overflow-hidden">
             {children || renderScreen()}
@@ -146,6 +147,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           activeScreen={activeScreen}
           onToggle={toggleNav}
           onNavigate={setActiveScreen}
+          onCreateNewPage={createNewPage}
         />
         <main className="flex-1 overflow-auto">
           {children || renderScreen()}

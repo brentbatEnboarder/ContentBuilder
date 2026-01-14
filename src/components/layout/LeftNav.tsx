@@ -36,6 +36,7 @@ interface LeftNavProps {
   activeScreen: ScreenType;
   onToggle: () => void;
   onNavigate: (screen: ScreenType) => void;
+  onCreateNewPage: () => void;
 }
 
 const setupItems: { icon: typeof FilePlus; label: string; screen: ScreenType }[] = [
@@ -55,6 +56,7 @@ export const LeftNav = ({
   activeScreen,
   onToggle,
   onNavigate,
+  onCreateNewPage,
 }: LeftNavProps) => {
   const { isOnboarding, isStepCompleted, canNavigateToStep } = useOnboarding();
 
@@ -198,7 +200,7 @@ export const LeftNav = ({
                     isActive={activeScreen === 'new-page'}
                     isCollapsed={isCollapsed}
                     isPrimary={newPageItem.isPrimary}
-                    onClick={() => canNavigate && onNavigate(newPageItem.screen)}
+                    onClick={() => canNavigate && onCreateNewPage()}
                   />
                 </div>
               );

@@ -43,8 +43,18 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
   // Handle initial screen based on navigation state
   // For existing customers (not in onboarding), go directly to pages
+  // IMPORTANT: Only do this on TRUE initial load, not on tab switch/remount
   useEffect(() => {
     if (hasSetInitialScreen.current || isOnboardingLoading) return;
+
+    // Check if we have saved navigation state (e.g., from tab switch)
+    // If so, don't override it - the user's position should be preserved
+    const savedNavState = sessionStorage.getItem('contentbuilder_nav_state');
+    if (savedNavState) {
+      // We have saved state, trust it and don't override
+      hasSetInitialScreen.current = true;
+      return;
+    }
 
     const state = location.state as { isExistingCustomer?: boolean } | null;
 

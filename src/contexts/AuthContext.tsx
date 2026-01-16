@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { logUsageEvent } from '@/services/usageLogger';
 
 interface AuthContextType {
   user: User | null;
@@ -31,10 +32,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // Log user login event
+        if (event === 'SIGNED_IN' && session?.user) {
+          logUsageEvent('user_login', { metadata: { provider: 'google' } });
+        }
       }
     );
 

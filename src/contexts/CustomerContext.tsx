@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
+import { logUsageEvent } from '@/services/usageLogger';
 
 export interface Customer {
   id: string;
@@ -104,6 +105,10 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const selectCustomer = useCallback((customer: Customer) => {
     setCurrentCustomer(customer);
     sessionStorage.setItem(CUSTOMER_STORAGE_KEY, JSON.stringify(customer));
+    logUsageEvent('customer_selected', {
+      customerId: customer.id,
+      metadata: { customer_name: customer.name },
+    });
   }, []);
 
   // Clear customer selection (called on logout)

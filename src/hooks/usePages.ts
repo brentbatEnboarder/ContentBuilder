@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useCustomer } from '@/contexts/CustomerContext';
+import { logUsageEvent } from '@/services/usageLogger';
 import type { Page, PageContent, ChatMessage } from '@/types/page';
 
 // Database row type (snake_case from Supabase)
@@ -102,8 +103,13 @@ export const usePages = () => {
       console.log('[usePages] Supabase create success', data);
       return rowToPage(data as PageRow);
     },
-    onSuccess: () => {
+    onSuccess: (newPage) => {
       queryClient.invalidateQueries({ queryKey: ['pages', customerId] });
+      logUsageEvent('page_created', {
+        customerId: customerId || undefined,
+        pageId: newPage.id,
+        metadata: { title: newPage.title },
+      });
     },
   });
 

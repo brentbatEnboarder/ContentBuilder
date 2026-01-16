@@ -13,6 +13,7 @@ import scrapeRoutes from './routes/scrape';
 import generateRoutes from './routes/generate';
 import transcribeRoutes from './routes/transcribe';
 import processRoutes from './routes/process';
+import adminRoutes from './routes/admin';
 
 // In development, load from parent .env. In production, Railway injects env vars
 if (process.env.NODE_ENV !== 'production') {
@@ -144,6 +145,7 @@ app.use('/api/scrape', authMiddleware, scrapeRoutes);
 app.use('/api/generate', authMiddleware, generateRoutes);
 app.use('/api/transcribe', authMiddleware, transcribeRoutes);
 app.use('/api/process', authMiddleware, processRoutes);
+app.use('/api/admin', authMiddleware, adminRoutes);
 
 // Serve static files in production
 if (isProduction) {

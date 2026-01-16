@@ -708,6 +708,37 @@ export const apiClient = {
     });
     return data;
   },
+
+  /**
+   * Fetch admin usage analytics (admin only)
+   */
+  getAdminUsage: async (): Promise<AdminUsageResponse> => {
+    const { data } = await api.get<AdminUsageResponse>('/admin/usage');
+    return data;
+  },
 };
+
+// Admin types
+export interface AdminUsageResponse {
+  success: boolean;
+  data: {
+    totals: {
+      logins: number | null;
+      customerSelections: number | null;
+      pagesCreated: number | null;
+      uniqueUsers: number;
+    };
+    activityByDay: Record<string, { logins: number; customers: number; pages: number }>;
+    recentEvents: Array<{
+      id: string;
+      eventType: string;
+      userId: string;
+      customerId: string | null;
+      pageId: string | null;
+      metadata: Record<string, unknown>;
+      createdAt: string;
+    }>;
+  };
+}
 
 export default apiClient;

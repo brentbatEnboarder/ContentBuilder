@@ -11,6 +11,7 @@ import { BrandVoiceScreen } from '@/components/screens/BrandVoiceScreen';
 import { ImageStyleScreen } from '@/components/screens/ImageStyleScreen';
 import { PagesScreen } from '@/components/screens/PagesScreen';
 import { PageEditorScreen } from '@/components/screens/PageEditorScreen';
+import { AdminScreen } from '@/components/screens/AdminScreen';
 
 interface AppLayoutProps {
   children?: ReactNode;
@@ -111,6 +112,8 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             onNavigate={setActiveScreen}
           />
         );
+      case 'admin':
+        return <AdminScreen />;
       default:
         return <CompanyInfoScreen />;
     }

@@ -9,12 +9,14 @@ import {
   Settings,
   Layers,
   Check,
+  Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NavItem } from './NavItem';
 import { UserMenu } from './UserMenu';
 import { useOnboarding, OnboardingStep } from '@/contexts/OnboardingContext';
 import { useNavigationGuard } from '@/contexts/NavigationGuardContext';
+import { useAdmin } from '@/hooks/useAdmin';
 import type { ScreenType } from '@/hooks/useNavigation';
 import {
   Tooltip,
@@ -30,6 +32,7 @@ const screenToStep: Record<ScreenType, OnboardingStep | undefined> = {
   pages: 'pages',
   'new-page': 'pages',
   'page-editor': 'pages',
+  admin: undefined,
 };
 
 interface LeftNavProps {
@@ -59,6 +62,7 @@ export const LeftNav = ({
 }: LeftNavProps) => {
   const { isOnboarding, isStepCompleted, canNavigateToStep } = useOnboarding();
   const { requestNewPage } = useNavigationGuard();
+  const { isAdmin } = useAdmin();
 
   const toggleButton = (
     <button
@@ -211,6 +215,19 @@ export const LeftNav = ({
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Admin link (only for admins) */}
+      {isAdmin && (
+        <div className={cn('mb-2', isCollapsed ? 'px-2' : 'px-3')}>
+          <NavItem
+            icon={Shield}
+            label="Admin"
+            isActive={activeScreen === 'admin'}
+            isCollapsed={isCollapsed}
+            onClick={() => onNavigate('admin')}
+          />
+        </div>
+      )}
 
       {/* User section */}
       <div className={cn(

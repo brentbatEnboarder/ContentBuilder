@@ -32,6 +32,10 @@ const screenConfig: Record<ScreenType, { title: string; subtitle?: string }> = {
   'page-editor': {
     title: 'Edit Page',
   },
+  'admin': {
+    title: 'Admin',
+    subtitle: 'View usage analytics and manage the application.',
+  },
 };
 
 export const TopHeader = ({ activeScreen }: TopHeaderProps) => {

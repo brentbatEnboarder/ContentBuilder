@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 
-export type ScreenType = 'new-page' | 'company' | 'voice' | 'style' | 'pages' | 'page-editor';
+export type ScreenType = 'new-page' | 'company' | 'voice' | 'style' | 'pages' | 'page-editor' | 'admin';
 
 const NAV_STATE_KEY = 'contentbuilder_nav_state';
 
@@ -20,7 +20,7 @@ function loadNavState(): PersistedNavState | null {
     if (!saved) return null;
     const parsed = JSON.parse(saved) as PersistedNavState;
     // Validate the screen type
-    const validScreens: ScreenType[] = ['new-page', 'company', 'voice', 'style', 'pages', 'page-editor'];
+    const validScreens: ScreenType[] = ['new-page', 'company', 'voice', 'style', 'pages', 'page-editor', 'admin'];
     if (!validScreens.includes(parsed.activeScreen)) return null;
     return parsed;
   } catch {
